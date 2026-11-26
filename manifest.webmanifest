@@ -1,0 +1,14 @@
+{
+  "name": "Kitchen Table",
+  "short_name": "Kitchen",
+  "description": "Recipes, dinner planning around shifts, and a shopping list.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f3f6f2",
+  "theme_color": "#1d7a58",
+  "icons": [
+    {"src": "icon-180.png", "sizes": "180x180", "type": "image/png"},
+    {"src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}
+  ]
+}
