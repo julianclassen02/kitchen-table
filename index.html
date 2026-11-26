@@ -1430,6 +1430,15 @@ const ACT={
   'restore-go':function(el){
     const c=ctxOf(el);let d;
     try{d=JSON.parse(c.text||'');}catch(e){toast('That isn’t a valid backup.');return;}
+    if(d&&d.kitchenTable===1&&d.recipesOnly&&Array.isArray(d.recipes)){
+      let n=0;
+      d.recipes.forEach(function(r){
+        if(!r||!r.id||!r.name||!Array.isArray(r.ingredients)||S.recipes[r.id])return;
+        S.recipes[r.id]=Object.assign({},r,{createdAt:r.createdAt||Date.now()});n++;
+      });
+      persistLocal();document.querySelectorAll('.overlay').forEach(function(o){o.remove();});render(true);
+      toast(n+' recipes added'+(n<d.recipes.length?', '+(d.recipes.length-n)+' already there':'')+'.');return;
+    }
     if(d&&d.kitchenTable===1&&d.shiftsOnly&&d.shifts&&typeof d.shifts==='object'){
       let added=0,kept=0;
       Object.keys(d.shifts).forEach(function(date){
