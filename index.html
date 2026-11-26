@@ -954,11 +954,12 @@ function shopCount(){
 }
 
 function viewShifts(){
-  const start=addDays(todayISO(),S.shiftOff*14);
+  const start=addDays(planBase(),S.shiftOff*7),today=todayISO();
   let h='<div class="stack"><div class="row-actions"><button class="btn ghost sm" data-act="rules">Settings</button></div>';
-  h+='<div class="range"><b>'+esc(fmtShort(start)+' – '+fmtShort(addDays(start,13)))+'</b><span class="row-actions"><button class="icon-btn" data-act="shift-nav" data-d="-1" aria-label="Earlier"'+(S.shiftOff<=0?' disabled style="opacity:.35"':'')+'>‹</button><button class="icon-btn" data-act="shift-nav" data-d="1" aria-label="Later">›</button></span></div>';
-  for(let i=0;i<14;i++){
-    const iso=addDays(start,i),inf=dayInfo(S,iso),jl=jLabel(inf),vl=vLabel(inf);
+  h+='<div class="range"><b>'+esc(fmtShort(start)+' – '+fmtShort(addDays(start,6)))+'</b><span class="row-actions"><button class="icon-btn" data-act="shift-nav" data-d="-1" aria-label="Earlier"'+(S.shiftOff<=planMin()?' disabled style="opacity:.35"':'')+'>‹</button><button class="icon-btn" data-act="shift-nav" data-d="1" aria-label="Later">›</button></span></div>';
+  for(let i=0;i<7;i++){
+    const iso=addDays(start,i);if(iso<today)continue;
+    const inf=dayInfo(S,iso),jl=jLabel(inf),vl=vLabel(inf);
     h+='<div class="shiftrow'+(iso===todayISO()?' today':'')+'"><span class="d"><b>'+DAYN[dowOf(iso)]+'</b>'+esc(fmtShort(iso))+'</span>'
       +'<button class="cell '+jl.cls+'" style="border:0;text-align:left;font-family:inherit" data-act="edit-day" data-who="j" data-date="'+iso+'"><small>Julian</small>'+esc(jl.t)+'</button><button class="cell '+vl.cls+'" style="border:0;text-align:left;font-family:inherit" data-act="edit-day" data-who="v" data-date="'+iso+'"><small>Viv</small>'+esc(vl.t)+'</button></div>';
   }
@@ -1261,7 +1262,7 @@ function openRules(){
         h+='</div>';
       }
       if(STANDALONE)h+='<div class="sect"><h3>This device</h3><div class="small muted">Everything is saved on this device only. Copy a backup now and then, and paste it back to restore.</div><div class="row-actions"><button class="btn ghost sm" data-act="backup-copy">Copy backup</button><button class="btn ghost sm" data-act="backup-restore">Restore or add data</button>'+(SAMPLE?'<button class="btn ghost sm" data-act="forget-key">Remove API key</button>':'')+'</div></div>';
-      h+='<div class="small muted" style="text-align:center">Version 26 Nov, 20:40</div>';
+      h+='<div class="small muted" style="text-align:center">Version 26 Nov, 21:00</div>';
       return h;
     },
     foot:function(){return '<button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="save-rules">Save</button>';}});
@@ -1350,7 +1351,7 @@ const ACT={
   close:function(el){closeSheet(el);},
   'confirm-ok':function(el){const c=ctxOf(el);closeSheet(el);if(c&&c.ok)c.ok();},
   'plan-nav':function(el){S.planOff=Math.max(planMin(),S.planOff+Number(el.dataset.d));render(true);view.scrollTop=0;},
-  'shift-nav':function(el){S.shiftOff=Math.max(0,S.shiftOff+Number(el.dataset.d));render(true);view.scrollTop=0;},
+  'shift-nav':function(el){S.shiftOff=Math.max(planMin(),S.shiftOff+Number(el.dataset.d));render(true);view.scrollTop=0;},
   'edit-day':function(el){if(guardWrite())openDay(el.dataset.date,el.dataset.who);},
   'pick-dinner':function(el){if(guardWrite())openPicker(el.dataset.date);},
   'set-dinner':function(el){
