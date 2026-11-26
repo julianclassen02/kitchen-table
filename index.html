@@ -847,9 +847,9 @@ function dayCard(iso){
     const ov=(S.settings.lunchOv||{})[tm];
     let src='';
     if(pl.length){if(tc==='recipe')src='from tonight’s '+recipeName(tp.rid);else if(tc==='nocook')src='not covered, tonight isn’t home-cooked';}
-    h+='<button class="note '+(pl.length?(tc==='recipe'?'good':(src?'warn':'')):'')+'" style="width:100%;text-align:left;border:0;font:inherit" data-act="edit-packed" data-date="'+tm+'">'
+    h+='<button class="note '+(pl.length?(tc==='recipe'?'good':(src?'warn':'')):'')+'" style="width:100%;text-align:left;border:0;font-family:inherit;cursor:pointer" data-act="edit-packed" data-date="'+tm+'">'
       +(pl.length?'Packed lunch needed tomorrow: <b>'+esc(namesOf(pl))+'</b>'+(src?' · '+esc(src):''):'No packed lunch needed tomorrow')
-      +(ov?' · edited':'')+' <span class="muted" style="float:right">Edit</span></button>';
+      +(ov?' · edited':'')+'</button>';
   }
   h+='<div class="dinner">';
   const when=hm(inf.dinnerAt);
