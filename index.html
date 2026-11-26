@@ -940,7 +940,7 @@ function recipeList(){
   }).sort(function(a,b){return a.name.localeCompare(b.name);});
   if(!list.length){
     if(Object.keys(S.recipes).length)return '<div class="empty muted">Nothing matches. Try another search.</div>';
-    return '<div class="empty"><h3>Your recipe book is empty</h3><p class="muted" style="margin:0">Add the dinners you actually cook. Screenshot a reel caption, paste text, or type one in.</p><button class="btn" data-act="add-recipe">Add your first recipe</button></div>';
+    return '<div class="empty"><h3>Your recipe book is empty</h3><p class="muted" style="margin:0">Add the dinners you actually cook. Import JSON from Claude, or add one manually.</p><button class="btn" data-act="add-recipe">Add your first recipe</button></div>';
   }
   return list.map(function(r){
     const bits=[(r.servings||2)+' portions'];if(r.time)bits.push(r.time+' min');
@@ -1205,12 +1205,8 @@ function openAddRecipe(){
       if(c.mode==='paste'){
         return h+'<div class="field"><label for="p-text">Paste the caption or recipe text</label><textarea id="p-text" data-bind="text" style="min-height:220px" placeholder="Long-press the caption on Instagram or TikTok, copy, and paste here">'+esc(c.text||'')+'</textarea></div>';
       }
-      h+='<label class="opt" style="cursor:pointer'+(can?'':';opacity:.5')+'"><span class="ic">▣</span><span><b>From a screenshot or photo</b><span>Caption, recipe page or cookbook. Pick one or more images.</span></span><input id="p-file" type="file" accept="'+esc(accept)+'" multiple hidden'+(can?'':' disabled')+'></label>'
-       +'<button class="opt" data-act="add-paste"'+(can?'':' disabled style="opacity:.5"')+'><span class="ic">✎</span><span><b>Paste text</b><span>Best for Instagram and TikTok captions.</span></span></button>'
-       +'<button class="opt" data-act="add-manual"><span class="ic">+</span><span><b>Type it in</b><span>Ingredients one per line, method one step per line.</span></span></button>';
-      if(!can&&STANDALONE)h+='<div class="sect"><h3>Turn on screenshot reading</h3><div class="small muted">Paste an Anthropic API key from console.anthropic.com. It stays on this device and is sent only to Anthropic. Each recipe costs a few pence. You can still type recipes in without it.</div><input id="p-key" class="inp" type="password" autocomplete="off" placeholder="sk-ant-…"><button class="btn" data-act="save-key">Save key</button></div>';
-      else if(!can)h+='<div class="note">Reading recipes needs Claude access, which isn’t available in this view. You can still type recipes in.</div>';
-      else h+='<div class="note">Links to Instagram and TikTok can’t be read directly. Their captions are usually behind a login. Screenshot or copy the caption instead.</div>';
+      h+='<button class="opt" data-act="import-json"><span class="ic">{ }</span><span><b>Import JSON</b><span>Paste recipes that Claude has formatted for you.</span></span></button>'
+       +'<button class="opt" data-act="add-manual"><span class="ic">+</span><span><b>Add manually</b><span>Ingredients one per line, method one step per line.</span></span></button>';
       return h;
     },
     foot:function(c){
@@ -1333,7 +1329,7 @@ function openRules(){
         h+='</div>';
       }
       if(STANDALONE)h+='<div class="sect"><h3>This device</h3><div class="small muted">Everything is saved on this device only. Copy a backup now and then, and paste it back to restore.</div><div class="row-actions"><button class="btn ghost sm" data-act="backup-copy">Copy backup</button><button class="btn ghost sm" data-act="backup-restore">Restore or add data</button>'+(SAMPLE?'<button class="btn ghost sm" data-act="forget-key">Remove API key</button>':'')+'</div></div>';
-      h+='<div class="small muted" style="text-align:center">Version 26 Nov, 22:05</div>';
+      h+='<div class="small muted" style="text-align:center">Version 26 Nov, 22:25</div>';
       return h;
     },
     foot:function(){return '<button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="save-rules">Save</button>';}});
@@ -1558,6 +1554,11 @@ const ACT={
   'backup-restore':function(){
     openSheet({title:'Restore or add data',ctx:{text:''},body:function(c){return '<div class="field"><label for="bk">Paste a backup, or shifts from Claude</label><textarea id="bk" data-bind="text" style="min-height:220px">'+esc(c.text||'')+'</textarea></div>';},
       foot:function(){return '<button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="restore-go">Restore</button>';}});
+  },
+  'import-json':function(el){
+    const o=el.closest('.overlay');if(o)o.remove();
+    openSheet({title:'Import JSON',ctx:{text:''},body:function(c){return '<div class="field"><label for="bk">Paste the JSON Claude gave you</label><textarea id="bk" data-bind="text" style="min-height:220px" placeholder="Recipes, shifts or a full backup">'+esc(c.text||'')+'</textarea></div>';},
+      foot:function(){return '<button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="restore-go">Import</button>';}});
   },
   'restore-go':function(el){
     const c=ctxOf(el);let d;
