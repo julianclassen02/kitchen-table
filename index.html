@@ -570,7 +570,7 @@ function builtinPreset(titleOf,iso,dowOf_){
 // ===== LOGIC END =====
 
 // ---------- state ----------
-const S={recipes:{},shifts:{},plan:{},settings:mergeSettings(null),shop:{checked:{},extras:[],horizon:5},
+const S={recipes:{},shifts:{},plan:{},settings:mergeSettings(null),shop:{checked:{},extras:[],horizon:'all'},
   tab:'plan',planOff:0,shiftOff:0,rq:'',rtag:'',loaded:{},canWrite:true,live:false,slow:false};
 let DB=null,SAMPLE=null,SAMPLE_LIM=null,pendingRender=false,STANDALONE=false;
 function lsGet(k){try{return localStorage.getItem(k);}catch(e){return null;}}
@@ -594,7 +594,7 @@ function syItems(){
 }
 function syApply(k,v){
   if(k==='settings')S.settings=mergeSettings(v);
-  else if(k==='shop')S.shop=Object.assign({checked:{},extras:[],horizon:5,shopped:{}},v||{});
+  else if(k==='shop')S.shop=Object.assign({checked:{},extras:[],horizon:'all',shopped:{}},v||{});
   else{const m={r:S.recipes,s:S.shifts,p:S.plan}[k.charAt(0)];if(m)m[k.slice(2)]=v;}
 }
 function syRemove(k){const m={r:S.recipes,s:S.shifts,p:S.plan}[k.charAt(0)];if(m&&k.charAt(1)===':')delete m[k.slice(2)];}
@@ -696,7 +696,7 @@ function loadLocal(){
   const raw=lsGet('kt-data');if(!raw)return;
   try{const d=JSON.parse(raw);
     S.recipes=d.recipes||{};S.shifts=d.shifts||{};S.plan=d.plan||{};S.settings=mergeSettings(d.settings);
-    S.shop=Object.assign({checked:{},extras:[],horizon:5,shopped:{}},d.shop||{});
+    S.shop=Object.assign({checked:{},extras:[],horizon:'all',shopped:{}},d.shop||{});
   }catch(e){}
 }
 function parseLoose(t){
@@ -757,7 +757,7 @@ const queues={};
 function localApply(path,data){
   const p=path.split('/'),col=p[0],id=p[1];
   if(col==='settings'){S.settings=mergeSettings(data);}
-  else if(col==='shopping'){S.shop=Object.assign({checked:{},extras:[],horizon:5,shopped:{}},data||{});}
+  else if(col==='shopping'){S.shop=Object.assign({checked:{},extras:[],horizon:'all',shopped:{}},data||{});}
   else if(data===null){delete S[col][id];}
   else{S[col][id]=Object.assign({id:id},data);}
 }
@@ -784,7 +784,7 @@ function subscribe(){
   DB.collection('shifts').where('date','>=',cutoff).onSnapshot(function(s){S.shifts=fromSnap(s);markLoaded('shifts');},err('shifts'));
   DB.collection('plan').where('date','>=',cutoff).onSnapshot(function(s){S.plan=fromSnap(s);markLoaded('plan');},err('plan'));
   DB.doc('settings/main').onSnapshot(function(d){S.settings=mergeSettings(d.exists?d.data():null);markLoaded('settings');},err('settings'));
-  DB.doc('shopping/state').onSnapshot(function(d){S.shop=Object.assign({checked:{},extras:[],horizon:5,shopped:{}},d.exists?d.data():{});markLoaded('shop');},err('shop'));
+  DB.doc('shopping/state').onSnapshot(function(d){S.shop=Object.assign({checked:{},extras:[],horizon:'all',shopped:{}},d.exists?d.data():{});markLoaded('shop');},err('shop'));
 }
 
 // ---------- helpers for views ----------
@@ -822,7 +822,7 @@ function shoppedDates(){
   return horizonDates().filter(function(d){const p=S.plan[d];return p&&p.kind==='recipe'&&sp[d+':'+p.rid];});
 }
 function saveShop(patch){
-  S.shop=Object.assign({checked:{},extras:[],horizon:5,shopped:{}},S.shop,patch);
+  S.shop=Object.assign({checked:{},extras:[],horizon:'all',shopped:{}},S.shop,patch);
   const o={checked:S.shop.checked||{},extras:S.shop.extras||[],horizon:S.shop.horizon,shopped:S.shop.shopped||{}};
   const keep={};Object.keys(o.shopped).forEach(function(k){if(k.slice(0,10)>=addDays(todayISO(),-14))keep[k]=true;});o.shopped=keep;
   write('shopping/state',o);render(true);
@@ -855,7 +855,7 @@ function dayCard(iso){
     const pl=inf.packedTomorrow,tc=dinnerCovers(S,iso),tp=S.plan[iso],tm=addDays(iso,1);
     const ov=(S.settings.lunchOv||{})[tm];
     let src='';
-    if(pl.length){if(tc==='recipe')src='from tonight’s '+recipeName(tp.rid);else if(tc==='nocook')src='not covered, tonight isn’t home-cooked';}
+    if(pl.length){if(tc==='recipe')src='from tonight’s '+recipeName(tp.rid);else if(tc==='nocook')src='not covered';}
     h+='<button class="note '+(pl.length?(tc==='recipe'?'good':(src?'warn':'')):'')+'" style="width:100%;text-align:left;border:0;font-family:inherit;cursor:pointer" data-act="edit-packed" data-date="'+tm+'">'
       +(pl.length?'Packed lunch needed tomorrow: <b>'+esc(namesOf(pl))+'</b>'+(src?' · '+esc(src):''):'No packed lunch needed tomorrow')
       +(ov?' · edited':'')+'</button>';
@@ -981,7 +981,7 @@ function render(force){
   $('#ttl').textContent=TITLES[S.tab][0];
   let sub=TITLES[S.tab][1];
   if(S.tab==='recipes'){const n=Object.keys(S.recipes).length;sub=n?n+' saved':'Your own cookbook';}
-  if(S.tab==='shop')sub='Next '+(S.shop.horizon==='all'?'planned dinners':S.shop.horizon+' days');
+  if(S.tab==='shop')sub=S.shop.horizon==='all'?'All planned dinners':'Next '+S.shop.horizon+' days';
   $('#sub').textContent=sub;
   document.querySelectorAll('.tab').forEach(function(b){if(b.dataset.tab===S.tab)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});
   const n=shopCount(),bd=$('#shopbadge');bd.hidden=!n;bd.textContent=n;
@@ -1262,7 +1262,7 @@ function openRules(){
         h+='</div>';
       }
       if(STANDALONE)h+='<div class="sect"><h3>This device</h3><div class="small muted">Everything is saved on this device only. Copy a backup now and then, and paste it back to restore.</div><div class="row-actions"><button class="btn ghost sm" data-act="backup-copy">Copy backup</button><button class="btn ghost sm" data-act="backup-restore">Restore or add data</button>'+(SAMPLE?'<button class="btn ghost sm" data-act="forget-key">Remove API key</button>':'')+'</div></div>';
-      h+='<div class="small muted" style="text-align:center">Version 26 Nov, 21:15</div>';
+      h+='<div class="small muted" style="text-align:center">Version 26 Nov, 21:30</div>';
       return h;
     },
     foot:function(){return '<button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="save-rules">Save</button>';}});
@@ -1509,7 +1509,7 @@ const ACT={
     if(!d||d.kitchenTable!==1||typeof d.recipes!=='object'){toast('That isn’t a Kitchen Table backup.');return;}
     confirmBox('Replace everything on this device with this backup?','Restore',function(){
       S.recipes=d.recipes||{};S.shifts=d.shifts||{};S.plan=d.plan||{};S.settings=mergeSettings(d.settings);
-      S.shop=Object.assign({checked:{},extras:[],horizon:5,shopped:{}},d.shop||{});
+      S.shop=Object.assign({checked:{},extras:[],horizon:'all',shopped:{}},d.shop||{});
       persistLocal();document.querySelectorAll('.overlay').forEach(function(o){o.remove();});render(true);toast('Backup restored');});
   },
   'import-ics':function(){if(guardWrite())openIcs();},
@@ -1603,7 +1603,7 @@ async function init(){
   }catch(e){}
   if(DB){subscribe();}
   else{
-    STANDALONE=true;loadLocal();applyBuiltins();syStart();
+    STANDALONE=true;loadLocal();applyBuiltins();if(!lsGet('kt-hz')){S.shop.horizon='all';lsSet('kt-hz','1');persistLocal();}syStart();
     const k=lsGet('kt-key');
     if(k){SAMPLE=makeApiSample(k);try{SAMPLE_LIM=await SAMPLE.limits();}catch(e){}}
     if(lsGet('kt-probe')===null&&!lsSet('kt-probe','1'))S.noStore=true;
