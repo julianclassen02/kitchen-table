@@ -354,6 +354,11 @@ function vOf(S,iso){
   return (even?anchorEarly:!anchorEarly)?early:late;
 }
 function packedFlags(S,iso){
+  const f=packedAuto(S,iso),o=(S.settings.lunchOv||{})[iso];
+  if(o){if(typeof o.julian==='boolean')f.julian=o.julian;if(typeof o.viv==='boolean')f.viv=o.viv;}
+  return f;
+}
+function packedAuto(S,iso){
   const J=jOf(S,iso),V=vOf(S,iso);
   return {
     julian:(function(){
@@ -837,18 +842,18 @@ function dayCard(iso){
   h+='<div class="people">'
     +'<button class="who '+(jl.cls==='need'?'need':jl.cls==='off'?'off':'j')+'" data-act="edit-day" data-date="'+iso+'"><small>Julian</small><span>'+esc(jl.t)+'</span></button>'
     +'<button class="who '+(vl.cls==='off'?'off':'v')+'" data-act="edit-day" data-date="'+iso+'"><small>Viv</small><span>'+esc(vl.t)+'</span></button></div>';
-  const pl=inf.packedTomorrow;
-  if(pl.length&&iso>=todayISO()){
-    const tc=dinnerCovers(S,iso),tp=S.plan[iso];
+  if(iso>=todayISO()){
+    const pl=inf.packedTomorrow,tc=dinnerCovers(S,iso),tp=S.plan[iso],tm=addDays(iso,1);
+    const ov=(S.settings.lunchOv||{})[tm];
     let src='';
-    if(tc==='recipe')src='from tonight’s '+recipeName(tp.rid);
-    else if(tc==='nocook')src='not covered, tonight isn’t home-cooked';
-    h+='<div class="note '+(tc==='recipe'?'good':(src?'warn':''))+'">Packed lunch needed tomorrow: <b>'+esc(namesOf(pl))+'</b>'+(src?' · '+esc(src):'')+'</div>';
+    if(pl.length){if(tc==='recipe')src='from tonight’s '+recipeName(tp.rid);else if(tc==='nocook')src='not covered, tonight isn’t home-cooked';}
+    h+='<button class="note '+(pl.length?(tc==='recipe'?'good':(src?'warn':'')):'')+'" style="width:100%;text-align:left;border:0;font:inherit" data-act="edit-packed" data-date="'+tm+'">'
+      +(pl.length?'Packed lunch needed tomorrow: <b>'+esc(namesOf(pl))+'</b>'+(src?' · '+esc(src):''):'No packed lunch needed tomorrow')
+      +(ov?' · edited':'')+' <span class="muted" style="float:right">Edit</span></button>';
   }
   h+='<div class="dinner">';
   const when=hm(inf.dinnerAt);
   const cooker=inf.cook==='either'?'Either of you cooks':PN[inf.cook]+' cooks';
-  h+='<div class="dinner-meta">Dinner about <b>'+when+'</b> · '+esc(cooker)+'</div>';
   if(p.kind==='recipe'){
     const r=S.recipes[p.rid];
     const portions=(p.portions!=null&&p.portions!=='')?p.portions:inf.portions;
@@ -1394,6 +1399,27 @@ const ACT={
   rtag:function(el){S.rtag=S.rtag===el.dataset.t?'':el.dataset.t;render(true);},
   'e-tag':function(el){const c=ctxOf(el),t=el.dataset.t,i=c.d.tags.indexOf(t);if(i>=0)c.d.tags.splice(i,1);else c.d.tags.push(t);el.setAttribute('aria-pressed',i<0);},
   'save-recipe':function(el){saveRecipe(ctxOf(el));},
+  'edit-packed':function(el){
+    const tm=el.dataset.date,f=packedFlags(S,tm);
+    openSheet({title:'Lunch on '+fmtDate(tm),ctx:{iso:tm,d:{j:f.julian,v:f.viv}},
+      body:function(c){return '<div class="small muted">Who needs a packed lunch for '+esc(fmtDate(c.iso))+'? This overrides the automatic answer.</div>'
+        +'<label class="sw"><input type="checkbox" data-bind="j"'+(c.d.j?' checked':'')+'> Julian</label>'
+        +'<label class="sw"><input type="checkbox" data-bind="v"'+(c.d.v?' checked':'')+'> Viv</label>';},
+      foot:function(){return '<button class="btn ghost" data-act="packed-reset">Back to automatic</button><button class="btn" data-act="packed-save">Save</button>';}});
+  },
+  'packed-save':function(el){
+    const c=ctxOf(el),a=packedAuto(S,c.iso),st=clone(S.settings),ov=Object.assign({},st.lunchOv||{}),t=todayISO();
+    Object.keys(ov).forEach(function(k){if(k<addDays(t,-1))delete ov[k];});
+    const o={};
+    if(!!c.d.j!==a.julian)o.julian=!!c.d.j;
+    if(!!c.d.v!==a.viv)o.viv=!!c.d.v;
+    if(Object.keys(o).length)ov[c.iso]=o;else delete ov[c.iso];
+    st.lunchOv=ov;write('settings/main',st);closeSheet(el);toast('Saved');
+  },
+  'packed-reset':function(el){
+    const c=ctxOf(el),st=clone(S.settings),ov=Object.assign({},st.lunchOv||{});
+    delete ov[c.iso];st.lunchOv=ov;write('settings/main',st);closeSheet(el);toast('Back to automatic');
+  },
   'toggle-away':function(el){
     const c=ctxOf(el),d=c.d;
     if(el.dataset.who==='j'){d.j=d.j==='away'?'work':'away';if(d.j==='away'&&!d.food)d.food=true;}
