@@ -627,7 +627,7 @@ function subscribe(){
 const PN={julian:'Julian',viv:'Viv'};
 function jLabel(inf){
   const j=inf.j;
-  if(j.state==='off')return {t:'Off',cls:'off'};
+  if(j.state==='off')return {t:'Off'+(j.title?' · '+j.title:''),cls:'off'};
   if(j.state==='away')return {t:'Away overnight'+(j.leave?' · leaves '+j.leave:''),cls:'j'};
   if(j.needsTimes)return {t:'Add times'+(j.title?' · '+j.title:''),cls:'need'};
   return {t:(j.leave||'?')+'–'+(j.ret||'?')+(j.retNext?' (+1)':'')+(j.title?' · '+j.title:''),cls:'j'};
@@ -791,7 +791,7 @@ function shopCount(){
 
 function viewShifts(){
   const start=addDays(todayISO(),S.shiftOff*14);
-  let h='<div class="stack"><div class="row-actions"><button class="btn soft sm" data-act="import-ics">Import calendar</button><button class="btn ghost sm" data-act="rules">Rules</button></div>';
+  let h='<div class="stack"><div class="row-actions"><button class="btn ghost sm" data-act="rules">Rules</button></div>';
   h+='<div class="range"><b>'+esc(fmtShort(start)+' – '+fmtShort(addDays(start,13)))+'</b><span class="row-actions"><button class="icon-btn" data-act="shift-nav" data-d="-1" aria-label="Earlier"'+(S.shiftOff<=0?' disabled style="opacity:.35"':'')+'>‹</button><button class="icon-btn" data-act="shift-nav" data-d="1" aria-label="Later">›</button></span></div>';
   for(let i=0;i<14;i++){
     const iso=addDays(start,i),inf=dayInfo(S,iso),jl=jLabel(inf),vl=vLabel(inf);
@@ -1025,7 +1025,6 @@ function openDay(iso){
       const seg=function(path,opts,cur){return '<div class="seg" role="group">'+opts.map(function(o){return '<button data-act="segset" data-path="'+path+'" data-val="'+o[0]+'" aria-pressed="'+(cur===o[0])+'">'+o[1]+'</button>';}).join('')+'</div>';};
       let h='<div class="sect"><h3 style="color:var(--j)">Julian</h3>'+seg('j',[['off','Off'],['work','Working'],['away','Away overnight']],d.j);
       if(d.j!=='off'){
-        h+='<div class="chips" style="flex-wrap:wrap;overflow:visible">'+P.map(function(p){return '<button class="chip" data-act="apply-preset" data-id="'+esc(p.id)+'" aria-pressed="'+(d.preset===p.id)+'">'+esc(p.name)+'</button>';}).join('')+'</div>';
         h+='<div class="two"><div class="field"><label for="d-leave">Leaves home</label><input id="d-leave" type="time" data-bind="leave" value="'+esc(d.leave)+'"></div>'
           +(d.j==='work'?'<div class="field"><label for="d-ret">Back home</label><input id="d-ret" type="time" data-bind="ret" value="'+esc(d.ret)+'"></div>':'<div class="field"><label for="d-back">Back home on</label><input id="d-back" type="date" min="'+addDays(iso,1)+'" data-bind="back" value="'+esc(d.back)+'"></div>')+'</div>';
         if(d.j==='away'&&d.back)h+='<div class="field"><label for="d-bret">Home at (on '+esc(fmtDate(d.back))+')</label><input id="d-bret" type="time" data-bind="backRet" value="'+esc(d.backRet)+'"></div><div class="note">'+Math.max(0,Math.round((parseISO(d.back)-parseISO(iso))/DAYMS))+' nights away. Days in between are filled in for you.</div>';
@@ -1047,7 +1046,7 @@ function saveDay(c){
   else julian={state:d.j,leave:d.leave||'',ret:d.j==='work'?(d.ret||''):'',food:!!d.food,title:d.title||'',preset:d.preset||'',edited:true,src:(old.julian&&old.julian.src)||''};
   let viv=null;
   if(d.vt!=='rota'){viv={type:d.vt};if(d.vt==='custom'){viv.start=d.vs||'09:00';viv.end=d.ve||'17:00';}}
-  if(d.j==='work'&&!d.leave&&!d.ret){toast('Add leave and return times, or pick a preset.');return;}
+  if(d.j==='work'&&!d.leave&&!d.ret){toast('Add the time you leave and the time you’re back.');return;}
   if(d.j==='away'&&d.back&&!d.backRet){toast('Add the time you’re home on the last day.');return;}
   const put=function(date,jul,vv){
     const doc={date:date};if(jul)doc.julian=jul;if(vv)doc.viv=vv;
@@ -1085,19 +1084,8 @@ function openRules(){
        +'<div class="field"><label for="r-cb">Cooking (min)</label><input id="r-cb" type="number" inputmode="numeric" data-bind="cookBuffer" value="'+esc(d.cookBuffer)+'"></div>'
        +'<div class="field"><label for="r-cm">Commute (min)</label><input id="r-cm" type="number" inputmode="numeric" data-bind="commute" value="'+esc(d.commute)+'"></div></div>'
        +'<label class="sw"><input type="checkbox" data-bind="takeaway"'+(d.takeaway?' checked':'')+'> Suggest one takeaway a week on the busiest evening</label></div>';
-      h+='<div class="sect"><h3 style="color:var(--j)">Julian’s shift presets</h3><div class="small muted">Imported shifts pick these by name and weekday. Match words are matched against the calendar title.</div>';
-      d.presets.forEach(function(p,i){
-        h+='<div class="card" style="box-shadow:none;display:flex;flex-direction:column;gap:10px">'
-         +'<div class="two"><div class="field"><label>Name</label><input data-bind="presets.'+i+'.name" value="'+esc(p.name)+'"></div><div class="field"><label>Match words</label><input data-bind="presets.'+i+'.match" value="'+esc(p.match)+'" placeholder="pls, tnt"></div></div>'
-         +'<div class="two"><div class="field"><label>Leaves</label><input type="time" data-bind="presets.'+i+'.leave" value="'+esc(p.leave)+'"></div><div class="field"><label>Back</label><input type="time" data-bind="presets.'+i+'.ret" value="'+esc(p.ret)+'"></div></div>'
-         +'<div class="chips" style="flex-wrap:wrap;overflow:visible">'+days.map(function(x){return '<button class="chip" data-act="toggle-arr" data-path="presets.'+i+'.days" data-val="'+x[0]+'" aria-pressed="'+((p.days||[]).indexOf(x[0])>=0)+'">'+x[1]+'</button>';}).join('')+'</div>'
-         +'<label class="sw"><input type="checkbox" data-bind="presets.'+i+'.food"'+(p.food?' checked':'')+'> Food provided</label>'
-         +'<label class="sw"><input type="checkbox" data-bind="presets.'+i+'.away"'+(p.away?' checked':'')+'> Away overnight</label>'
-         +'<button class="btn danger sm" data-act="del-preset" data-i="'+i+'" style="align-self:flex-start">Remove preset</button></div>';
-      });
-      h+='<button class="btn ghost" data-act="add-preset">+ Add preset</button></div>';
       h+='<div class="sect"><h3>Staples</h3><div class="small muted">Always in the cupboard. They’re listed separately so they don’t clutter the shop.</div><div class="field"><textarea data-bind="staples" style="min-height:80px" aria-label="Staples">'+esc(d.staples)+'</textarea></div></div>';
-      if(STANDALONE)h+='<div class="sect"><h3>This device</h3><div class="small muted">Everything is saved on this device only. Copy a backup now and then, and paste it back to restore.</div><div class="row-actions"><button class="btn ghost sm" data-act="backup-copy">Copy backup</button><button class="btn ghost sm" data-act="backup-restore">Restore backup</button>'+(SAMPLE?'<button class="btn ghost sm" data-act="forget-key">Remove API key</button>':'')+'</div></div>';
+      if(STANDALONE)h+='<div class="sect"><h3>This device</h3><div class="small muted">Everything is saved on this device only. Copy a backup now and then, and paste it back to restore.</div><div class="row-actions"><button class="btn ghost sm" data-act="backup-copy">Copy backup</button><button class="btn ghost sm" data-act="backup-restore">Restore or add data</button>'+(SAMPLE?'<button class="btn ghost sm" data-act="forget-key">Remove API key</button>':'')+'</div></div>';
       return h;
     },
     foot:function(){return '<button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="save-rules">Save rules</button>';}});
@@ -1271,12 +1259,26 @@ const ACT={
     try{navigator.clipboard.writeText(t).then(function(){toast('Backup copied. Paste it into Notes.');},fallback);}catch(e){fallback();}
   },
   'backup-restore':function(){
-    openSheet({title:'Restore backup',ctx:{text:''},body:function(c){return '<div class="field"><label for="bk">Paste your backup</label><textarea id="bk" data-bind="text" style="min-height:220px">'+esc(c.text||'')+'</textarea></div>';},
+    openSheet({title:'Restore or add data',ctx:{text:''},body:function(c){return '<div class="field"><label for="bk">Paste a backup, or shifts from Claude</label><textarea id="bk" data-bind="text" style="min-height:220px">'+esc(c.text||'')+'</textarea></div>';},
       foot:function(){return '<button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="restore-go">Restore</button>';}});
   },
   'restore-go':function(el){
     const c=ctxOf(el);let d;
     try{d=JSON.parse(c.text||'');}catch(e){toast('That isn’t a valid backup.');return;}
+    if(d&&d.kitchenTable===1&&d.shiftsOnly&&d.shifts&&typeof d.shifts==='object'){
+      let added=0,kept=0;
+      Object.keys(d.shifts).forEach(function(date){
+        if(!/^\d{4}-\d{2}-\d{2}$/.test(date))return;
+        const ex=S.shifts[date],v=d.shifts[date];
+        if(ex&&ex.julian&&(ex.julian.edited||ex.julian.state!=='off')){kept++;return;}
+        const off=String(v).charAt(0)==='!',title=off?String(v).slice(1):String(v);
+        const doc={date:date,julian:off?{state:'off',title:title,edited:true}:{state:'work',leave:'',ret:'',food:false,title:title}};
+        if(ex&&ex.viv)doc.viv=ex.viv;
+        S.shifts[date]=Object.assign({id:date},doc);added++;
+      });
+      persistLocal();document.querySelectorAll('.overlay').forEach(function(o){o.remove();});render(true);
+      toast(added+' days added'+(kept?', '+kept+' left as you had them':'')+'. Tap a day to add times.');return;
+    }
     if(!d||d.kitchenTable!==1||typeof d.recipes!=='object'){toast('That isn’t a Kitchen Table backup.');return;}
     confirmBox('Replace everything on this device with this backup?','Restore',function(){
       S.recipes=d.recipes||{};S.shifts=d.shifts||{};S.plan=d.plan||{};S.settings=mergeSettings(d.settings);
@@ -1378,7 +1380,7 @@ async function init(){
     const k=lsGet('kt-key');
     if(k){SAMPLE=makeApiSample(k);try{SAMPLE_LIM=await SAMPLE.limits();}catch(e){}}
     if(lsGet('kt-probe')===null&&!lsSet('kt-probe','1'))S.noStore=true;
-    silentRefresh();
+    lsDel('kt-ics');lsDel('kt-ics-at');
     if('serviceWorker' in navigator&&/^https?:/.test(location.protocol)){navigator.serviceWorker.register('sw.js').catch(function(){});}
   }
   render(true);
