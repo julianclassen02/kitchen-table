@@ -355,7 +355,12 @@ function vOf(S,iso){
 function packedFlags(S,iso){
   const J=jOf(S,iso),V=vOf(S,iso);
   return {
-    julian:J.state==='work'&&!J.food&&!!mins(J.leave),
+    julian:(function(){
+      if(J.state!=='work'||J.food)return false;
+      const l=mins(J.leave),r=mins(J.ret);
+      // needs a packed meal only if out at lunchtime: leaves by 11:30 and not back before 13:00
+      return l!=null&&l<=690&&(r==null||r<=l||r>=780);
+    })(),
     viv:V.state==='work'&&!!S.settings.vPacked
   };
 }
@@ -832,7 +837,7 @@ function dayCard(iso){
     let src;
     if(yc==='recipe')src='from '+fmtDate(addDays(iso,-1)).split(' ')[0]+'’s '+recipeName(yp.rid);
     else if(yc==='nocook')src='not covered, last night isn’t home-cooked';
-    else src=iso>todayISO()?'plan last night’s dinner to cover it':'';
+    else src='';
     h+='<div class="note '+(yc==='recipe'?'good':(src?'warn':''))+'">Packed meal today: <b>'+esc(namesOf(pl))+'</b>'+(src?' · '+esc(src):'')+'</div>';
   }
   h+='<div class="dinner">';
