@@ -957,7 +957,7 @@ function viewRecipes(){
   return h+'</div>';
 }
 
-// Only exact matches get a picture; '' entries block a looser match below (no icon is better than a misleading one).
+// Only exact matches get a picture; '' entries block a looser match below and fall back to the cart.
 const ICONS=[
 ['stock',''],['stock cube',''],['bouillon',''],['paste',''],['puree',''],['sauce',''],['oil',''],['vinegar',''],['peanut butter',''],['coconut milk',''],['coconut oil',''],['oat milk',''],['almond milk',''],['soy milk',''],['lemon juice',''],['garlic bread',''],['egg noodle',''],['breadcrumb',''],['black pepper',''],['ice cream','🍦'],['rice noodle','🍜'],
 ['toilet roll','🧻'],['toilet paper','🧻'],['loo roll','🧻'],['kitchen roll','🧻'],['kitchen towel','🧻'],['soap','🧼'],['hand wash','🧼'],['sponge','🧽'],['shampoo','🧴'],['conditioner','🧴'],['lotion','🧴'],['sun cream','🧴'],['toothbrush','🪥'],['razor','🪒'],['plaster','🩹'],['painkiller','💊'],['paracetamol','💊'],['ibuprofen','💊'],['vitamin','💊'],['battery','🔋'],['batteries','🔋'],['light bulb','💡'],['candle','🕯️'],['flower','💐'],
@@ -970,8 +970,8 @@ const ICON_C={};
 function ICON_RX(k){return ICON_C[k]||(ICON_C[k]=new RegExp('\\b'+k.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')));}
 function iconFor(name){
   const n=String(name||'').toLowerCase();
-  for(const k of ICONS){if(ICON_RX(k[0]).test(n))return k[1];}
-  return '';
+  for(const k of ICONS){if(ICON_RX(k[0]).test(n))return k[1]||'🛒';}
+  return '🛒';
 }
 function shopItemHtml(it,done,aisle){
   const q=fmtQ(it.q,it.u),sub=it.from&&it.from.length?'<small>'+esc(it.from.join(', '))+'</small>':'';
@@ -1333,7 +1333,7 @@ function openRules(){
         h+='</div>';
       }
       if(STANDALONE)h+='<div class="sect"><h3>This device</h3><div class="small muted">Everything is saved on this device only. Copy a backup now and then, and paste it back to restore.</div><div class="row-actions"><button class="btn ghost sm" data-act="backup-copy">Copy backup</button><button class="btn ghost sm" data-act="backup-restore">Restore or add data</button>'+(SAMPLE?'<button class="btn ghost sm" data-act="forget-key">Remove API key</button>':'')+'</div></div>';
-      h+='<div class="small muted" style="text-align:center">Version 26 Nov, 21:55</div>';
+      h+='<div class="small muted" style="text-align:center">Version 26 Nov, 22:05</div>';
       return h;
     },
     foot:function(){return '<button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="save-rules">Save</button>';}});
