@@ -90,15 +90,28 @@ h1,h2,h3{font-family:var(--font-display);margin:0;letter-spacing:-.01em;text-wra
 .icon-btn{border:0;background:var(--paper);color:var(--ink);width:44px;height:44px;border-radius:50%;font-size:20px;line-height:1;display:inline-flex;align-items:center;justify-content:center}
 .row-actions{display:flex;gap:8px;flex-wrap:wrap}
 
+
+/* header + week navigator */
+#topact{display:flex;align-items:center;gap:8px}
+#topact .icon-btn{background:var(--card);border:1px solid var(--line);width:42px;height:42px}
+#topact .btn.sm{min-height:42px;border-radius:99px;padding:0 16px}
+.wknav{display:grid;grid-template-columns:44px 1fr 44px;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:6px}
+.wknav .icon-btn{background:var(--paper);width:44px;height:44px;font-size:22px}
+.wknav .icon-btn[disabled]{opacity:.3;pointer-events:none}
+.wk-mid{text-align:center;display:flex;flex-direction:column;gap:1px}
+.wk-mid b{font-family:var(--font-display);font-size:18px;font-weight:700}
+.wk-mid span{font-size:12.5px;color:var(--muted)}
+.day-head .dd8{font-size:15px;color:var(--muted);font-weight:500}
+.day-head .pill{margin-left:auto}
 /* plan */
 .range{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:4px 0 2px}
 .range b{font-family:var(--font-display);font-size:17px}
-.day{display:flex;flex-direction:column;gap:10px}
+.day{display:flex;flex-direction:column;gap:10px;padding:14px 14px 12px}
 .day.today{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent),var(--shadow)}
-.day-head{display:flex;align-items:center;gap:8px}
-.day-head b{font-family:var(--font-display);font-size:19px;font-weight:700}
+.day-head{display:flex;align-items:baseline;gap:8px}
+.day-head b{font-family:var(--font-display);font-size:20px;font-weight:700}
 .people{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.who{border:0;text-align:left;border-radius:12px;padding:10px 12px;min-height:56px;display:flex;flex-direction:column;gap:1px;min-width:0}
+.who{border:0;text-align:left;border-radius:12px;padding:8px 12px;min-height:52px;display:flex;flex-direction:column;gap:1px;min-width:0}
 .who small{font-size:12px;font-weight:600;opacity:.85}
 .who span{font-size:14px;font-weight:500;overflow-wrap:anywhere}
 .who.j{background:var(--j-soft);color:var(--j)}
@@ -127,6 +140,8 @@ h1,h2,h3{font-family:var(--font-display);margin:0;letter-spacing:-.01em;text-wra
 .chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 .row{width:100%;text-align:left;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px 14px;display:flex;flex-direction:column;gap:6px}
 .row .t{font-family:var(--font-display);font-size:18px;font-weight:600;overflow-wrap:anywhere}
+.row .m .pill{font-size:11.5px;padding:1px 8px}
+.row{gap:5px;padding:11px 14px}
 .row .m{font-size:13px;color:var(--muted);display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 .empty{text-align:center;padding:36px 18px;display:flex;flex-direction:column;gap:12px;align-items:center}
 .empty h3{font-size:20px}
@@ -154,7 +169,7 @@ details.dd .ddb{padding:0 0 6px;border-top:1px solid var(--line)}
 .addpill input{flex:1;border:0;background:none;font-size:17px;padding:14px 0;outline:none;min-width:0}
 .addpill button{width:36px;height:36px;border-radius:50%;border:0;background:var(--accent);color:var(--accent-ink);font-size:22px;line-height:1}
 .mgroup{display:flex;flex-direction:column;margin-top:10px}
-.mgroup h3{font-size:21px;margin:0 0 4px}
+.mgroup h3{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600;margin:6px 4px 2px;font-family:var(--font-body)}
 .mi{display:flex;align-items:center;gap:14px;padding:10px 0;width:100%;text-align:left;background:none;border:0}
 .mi .ico{flex:none;width:52px;height:52px;border-radius:14px;background:var(--paper);display:flex;align-items:center;justify-content:center;font-size:30px}
 .mi .nm{flex:1;min-width:0}
@@ -875,15 +890,17 @@ function saveShop(patch){
 }
 
 // ---------- views ----------
+function wkNav(act,label,off,min,sub){
+  const rel=off===0?'This week':off===1?'Next week':off===-1?'Last week':off>1?'In '+off+' weeks':Math.abs(off)+' weeks ago';
+  return '<div class="wknav"><button class="icon-btn" data-act="'+act+'" data-d="-1" aria-label="Earlier week"'+(off<=min?' disabled':'')+'>‹</button>'
+    +'<div class="wk-mid"><b>'+esc(label)+'</b><span>'+esc(rel)+'</span></div>'
+    +'<button class="icon-btn" data-act="'+act+'" data-d="1" aria-label="Later week">›</button></div>';
+}
 function viewPlan(){
   const dates=planDates();
-  const planned=dates.filter(function(d){const p=S.plan[d];return p&&p.kind;}).length;
-  const wk=addDays(planBase(),S.planOff*7),label=fmtShort(wk)+' – '+fmtShort(addDays(wk,6));
+    const wk=addDays(planBase(),S.planOff*7),label=fmtShort(wk)+' – '+fmtShort(addDays(wk,6));
   let h='<div class="stack">';
-  h+='<div class="range"><b>'+esc(label)+'</b><span class="row-actions">'
-    +'<button class="icon-btn" data-act="plan-nav" data-d="-1" aria-label="Earlier week"'+(S.planOff<=planMin()?' disabled style="opacity:.35"':'')+'>‹</button>'
-    +'<button class="icon-btn" data-act="plan-nav" data-d="1" aria-label="Later week">›</button></span></div>';
-  h+='<div class="small muted" style="margin-top:-6px">'+planned+' of '+dates.length+' dinners decided</div>';
+  h+=wkNav('plan-nav',label,S.planOff,planMin(),'');
   dates.forEach(function(iso){h+=dayCard(iso);});
   h+='<button class="btn soft block" data-act="tab" data-tab="shop">See the shopping list</button>';
   return h+'</div>';
@@ -893,7 +910,7 @@ function dayCard(iso){
   const jl=jLabel(inf),vl=vLabel(inf);
   const sug=takeawaySuggestion(S,iso,todayISO())===iso&&!(p&&p.kind);
   let h='<article class="card day'+(today?' today':'')+(sug?' suggest':'')+'">';
-  h+='<div class="day-head"><b>'+esc(fmtDate(iso))+'</b>'+(today?'<span class="pill">Today</span>':'')+'</div>';
+  h+='<div class="day-head"><b>'+DAYN[dowOf(iso)]+'</b><span class="dd8">'+esc(fmtShort(iso))+'</span>'+(today?'<span class="pill">Today</span>':'')+'</div>';
   h+='<div class="people">'
     +'<button class="who '+(jl.cls==='need'?'need':jl.cls==='off'?'off':'j')+'" data-act="edit-day" data-who="j" data-date="'+iso+'"><small>Julian</small><span>'+esc(jl.t)+'</span></button>'
     +'<button class="who '+(vl.cls==='off'?'off':'v')+'" data-act="edit-day" data-who="v" data-date="'+iso+'"><small>Viv</small><span>'+esc(vl.t)+'</span></button></div>';
@@ -961,7 +978,6 @@ function viewRecipes(){
   let h='<div class="stack"><input class="search" id="rsearch" type="search" placeholder="Search recipes or ingredients" value="'+esc(S.rq)+'" autocomplete="off">';
   if(tags.length)h+='<div class="chips">'+tags.map(function(t){return '<button class="chip" aria-pressed="'+(S.rtag===t)+'" data-act="rtag" data-t="'+esc(t)+'">'+esc(t)+'</button>';}).join('')+'</div>';
   h+='<div class="stack" id="rlist">'+recipeList()+'</div>';
-  if(Object.keys(S.recipes).length)h+='<div class="fab"><button class="btn" data-act="add-recipe">+ Add recipe</button></div>';
   return h+'</div>';
 }
 
@@ -999,7 +1015,6 @@ function viewShop(){
   const sd=shoppedDates().length;
   let h='<div class="stack"><div class="seg" role="group" aria-label="Days to shop for">'
    +[[3,'3'],[4,'4'],[5,'5'],[6,'6'],[7,'7'],['all','All']].map(function(o){return '<button aria-pressed="'+(hz===o[0])+'" data-act="horizon" data-h="'+o[0]+'">'+o[1]+'</button>';}).join('')+'</div>';
-  h+='<div class="shop-head"><h2>Shopping list ('+left+')</h2><button class="icon-btn" data-act="shop-copy" aria-label="Copy list"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="M8 7l4-4 4 4"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg></button></div>';
   h+='<div class="addpill"><input id="extra" placeholder="Add something else" autocomplete="off"><button data-act="add-extra" aria-label="Add">+</button></div>';
   if(data.staples.length){
     const st=data.staples.slice().sort(function(x,y){return (ck[x.key]?1:0)-(ck[y.key]?1:0);}),sl=st.filter(function(i){return !ck[i.key];}).length;
@@ -1026,8 +1041,8 @@ function shopCount(){
 
 function viewShifts(){
   const start=addDays(planBase(),S.shiftOff*7),today=todayISO();
-  let h='<div class="stack"><div class="row-actions"><button class="btn ghost sm" data-act="rules">Settings</button></div>';
-  h+='<div class="range"><b>'+esc(fmtShort(start)+' – '+fmtShort(addDays(start,6)))+'</b><span class="row-actions"><button class="icon-btn" data-act="shift-nav" data-d="-1" aria-label="Earlier"'+(S.shiftOff<=planMin()?' disabled style="opacity:.35"':'')+'>‹</button><button class="icon-btn" data-act="shift-nav" data-d="1" aria-label="Later">›</button></span></div>';
+  let h='<div class="stack">';
+  h+=wkNav('shift-nav',fmtShort(start)+' – '+fmtShort(addDays(start,6)),S.shiftOff,planMin(),'');
   for(let i=0;i<7;i++){
     const iso=addDays(start,i);if(iso<today)continue;
     const inf=dayInfo(S,iso),jl=jLabel(inf),vl=vLabel(inf);
@@ -1037,7 +1052,15 @@ function viewShifts(){
   return h+'</div>';
 }
 
-const TITLES={plan:['Plan','Who’s home, what’s for dinner'],recipes:['Recipes',''],shop:['Shopping',''],shifts:['Shifts','Julian and Viv']};
+const TITLES={plan:['Plan',''],recipes:['Recipes',''],shop:['Shop',''],shifts:['Shifts','']};
+const GEAR='<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>';
+const SHARE='<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="M8 7l4-4 4 4"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg>';
+function topActs(){
+  let h='';
+  if(S.tab==='recipes'&&Object.keys(S.recipes).length)h+='<button class="btn sm" data-act="add-recipe">+ Add</button>';
+  if(S.tab==='shop'&&shopCount()>=0&&(S.shop.extras||[]).length+buildShopping(S,shopDates()).aisles.length>0)h+='<button class="icon-btn" data-act="shop-copy" aria-label="Copy list">'+SHARE+'</button>';
+  return h+'<button class="icon-btn" data-act="rules" aria-label="Settings">'+GEAR+'</button>';
+}
 function render(force){
   const a=document.activeElement;
   if(!force&&a&&view.contains(a)&&/^(INPUT|TEXTAREA)$/.test(a.tagName)){pendingRender=true;return;}
@@ -1051,8 +1074,12 @@ function render(force){
   view.innerHTML=h;view.scrollTop=sc;
   $('#ttl').textContent=TITLES[S.tab][0];
   let sub=TITLES[S.tab][1];
+  if(S.tab==='plan'){const dd=planDates();sub=dd.filter(function(d){const p=S.plan[d];return p&&p.kind;}).length+' of '+dd.length+' dinners decided this week';}
+  if(S.tab==='shifts')sub='Tap a name to edit their shift';
   if(S.tab==='recipes'){const n=Object.keys(S.recipes).length;sub=n?n+' saved':'Your own cookbook';}
-  if(S.tab==='shop')sub=S.shop.horizon==='all'?'All planned dinners':'Next '+S.shop.horizon+' days';
+  if(S.tab==='shop'){const nn=shopCount();sub=nn+(nn===1?' item':' items')+' to buy · '+(S.shop.horizon==='all'?'all planned dinners':'next '+S.shop.horizon+' days');}
+  $('#topact').innerHTML=topActs();
+  $('#sub').hidden=!sub;
   $('#sub').textContent=sub;
   document.querySelectorAll('.tab').forEach(function(b){if(b.dataset.tab===S.tab)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});
   const n=shopCount(),bd=$('#shopbadge');bd.hidden=!n;bd.textContent=n;
@@ -1340,7 +1367,7 @@ function openRules(){
         h+='<div class="set-lbl">Data</div>';
         h+='<button class="opt" data-act="backup-restore"><span class="ic">{ }</span><span><b>Import shifts</b><span>Paste the shifts JSON Claude gives you.</span></span></button>';
       }
-      h+='<div class="small muted" style="text-align:center;padding-top:4px">Version 26 Nov, 22:50</div>';
+      h+='<div class="small muted" style="text-align:center;padding-top:4px">Version 26 Nov, 23:20</div>';
       return h;
     },
     foot:function(){return '<button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="save-rules">Save</button>';}});
