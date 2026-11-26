@@ -144,6 +144,7 @@ details.dd summary{display:flex;align-items:center;gap:10px;padding:14px 0;curso
 details.dd summary::-webkit-details-marker{display:none}
 details.dd summary>span:first-child{flex:1}
 details.dd .cnt{font-family:var(--font-body);font-size:13px;font-weight:600;color:var(--muted);background:var(--paper);border-radius:999px;padding:2px 10px}
+details.dd .clr{border:1px solid var(--line);background:none;border-radius:999px;padding:3px 12px;font-size:13px;font-weight:600;color:var(--muted)}
 details.dd .chev{color:var(--muted);transition:transform .15s}
 details.dd[open] .chev{transform:rotate(180deg)}
 details.dd .ddb{padding:0 0 6px;border-top:1px solid var(--line)}
@@ -463,13 +464,23 @@ function isStaple(name,staples){
   return String(staples||'').split(',').map(function(x){return ingKey(x);}).filter(Boolean).some(function(s){
     return k===s||new RegExp('\\b'+s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b').test(k);});
 }
-function buildShopping(S,dates){
-  const map=new Map();
-  for(const iso of dates){
-    const p=S.plan[iso];if(!p||p.kind!=='recipe')continue;
-    const r=S.recipes[p.rid];if(!r)continue;
+function mealsOn(S,iso){
+  const p=S.plan[iso],out=[];
+  if(!p)return out;
+  if(p.kind==='recipe'&&p.rid){
     const info=dayInfo(S,iso);
-    const portions=(p.portions!=null&&p.portions!=='')?p.portions:info.portions;
+    out.push({key:iso+':'+p.rid,rid:p.rid,portions:(p.portions!=null&&p.portions!=='')?p.portions:info.portions});
+  }
+  if(p.lunch&&p.lunch.kind==='recipe'&&p.lunch.rid)out.push({key:'L'+iso+':'+p.lunch.rid,rid:p.lunch.rid,portions:(p.lunch.portions!=null&&p.lunch.portions!=='')?p.lunch.portions:2});
+  return out;
+}
+function buildShopping(S,dates){
+  const map=new Map(),spd=(S.shop&&S.shop.shopped)||{};
+  for(const iso of dates){
+   for(const m of mealsOn(S,iso)){
+    if(spd[m.key])continue;
+    const r=S.recipes[m.rid];if(!r)continue;
+    const portions=m.portions;
     const f=portions/(r.servings||2);
     for(const ing of (r.ingredients||[])){
       const key=ingKey(ing.n)+'|'+(ing.u||'');
@@ -478,6 +489,7 @@ function buildShopping(S,dates){
       if(ing.q!=null)it.q=(it.q||0)+ing.q*f;
       if(it.from.indexOf(r.name)<0)it.from.push(r.name);
     }
+   }
   }
   const out={},staples=[];
   map.forEach(function(it){
@@ -841,11 +853,11 @@ function horizonDates(){
 }
 function shopDates(){
   const sp=S.shop.shopped||{};
-  return horizonDates().filter(function(d){const p=S.plan[d];return p&&p.kind==='recipe'&&!sp[d+':'+p.rid];});
+  return horizonDates().filter(function(d){return mealsOn(S,d).some(function(m){return !sp[m.key];});});
 }
 function shoppedDates(){
   const sp=S.shop.shopped||{};
-  return horizonDates().filter(function(d){const p=S.plan[d];return p&&p.kind==='recipe'&&sp[d+':'+p.rid];});
+  return horizonDates().filter(function(d){const ms=mealsOn(S,d);return ms.length&&ms.every(function(m){return sp[m.key];});});
 }
 function saveShop(patch){
   S.shop=Object.assign({checked:{},extras:[],horizon:'all',shopped:{}},S.shop,patch);
@@ -887,6 +899,13 @@ function dayCard(iso){
       +(ov?' · edited':'')+'</button>';
   }
   h+='<div class="dinner">';
+  if(inf.j.state==='off'&&inf.v.state==='off'){
+    const lu=p.lunch;
+    if(lu&&lu.kind){
+      const nm=lu.kind==='recipe'?recipeName(lu.rid):(lu.kind==='takeaway'?'Takeaway lunch':'Lunch out');
+      h+='<div class="small muted" style="margin-bottom:-4px">Lunch</div><div class="chosen"><button class="name" '+(lu.kind==='recipe'?'data-act="open-recipe" data-id="'+esc(lu.rid)+'"':'data-act="pick-lunch" data-date="'+iso+'"')+'>'+esc(nm)+'</button><button class="btn ghost sm" data-act="pick-lunch" data-date="'+iso+'">Change</button></div><div class="small muted" style="margin:6px 0 -4px">Dinner</div>';
+    }else h+='<button class="pick" style="margin-bottom:8px" data-act="pick-lunch" data-date="'+iso+'">+ Choose lunch</button>';
+  }
   const when=hm(inf.dinnerAt);
   const cooker=inf.cook==='either'?'Either of you cooks':PN[inf.cook]+' cooks';
   if(p.kind==='recipe'){
@@ -951,9 +970,9 @@ function shopItemHtml(it,done,aisle){
   const q=fmtQ(it.q,it.u),sub=it.from&&it.from.length?'<small>'+esc(it.from.join(', '))+'</small>':'';
   return '<button class="mi'+(done?' done':'')+'" data-act="tick" data-key="'+esc(it.key)+'"><span class="ico">'+iconFor(it.name,aisle)+'</span><span class="nm"><span class="t">'+(q?'<b>'+esc(q)+'</b> ':'')+'<span class="cap">'+esc(it.name)+'</span></span>'+sub+'</span><span class="cb">✓</span></button>';
 }
-function ddHtml(key,title,n,inner,defOpen){
+function ddHtml(key,title,n,inner,defOpen,extra){
   const o=S.ui&&key in S.ui?S.ui[key]:defOpen;
-  return '<details class="dd'+'" data-dd="'+key+'"'+(o?' open':'')+'><summary><span>'+esc(title)+'</span><span class="cnt">'+n+'</span><svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></summary><div class="ddb">'+inner+'</div></details>';
+  return '<details class="dd'+'" data-dd="'+key+'"'+(o?' open':'')+'><summary><span>'+esc(title)+'</span><span class="cnt">'+n+'</span>'+(extra||'')+'<svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></summary><div class="ddb">'+inner+'</div></details>';
 }
 function viewShop(){
   const data=buildShopping(S,shopDates());
@@ -964,7 +983,7 @@ function viewShop(){
   const left=data.aisles.reduce(function(n,a){return n+a.items.filter(function(i){return !ck[i.key];}).length;},0)+ex.filter(function(e){return !e.done;}).length;
   const sd=shoppedDates().length;
   let h='<div class="stack"><div class="seg" role="group" aria-label="Days to shop for">'
-   +[[3,'3 days'],[5,'5 days'],[7,'7 days'],['all','All planned']].map(function(o){return '<button aria-pressed="'+(hz===o[0])+'" data-act="horizon" data-h="'+o[0]+'">'+o[1]+'</button>';}).join('')+'</div>';
+   +[[3,'3'],[4,'4'],[5,'5'],[6,'6'],[7,'7'],['all','All']].map(function(o){return '<button aria-pressed="'+(hz===o[0])+'" data-act="horizon" data-h="'+o[0]+'">'+o[1]+'</button>';}).join('')+'</div>';
   h+='<div class="shop-head"><h2>Shopping list ('+left+')</h2><button class="icon-btn" data-act="shop-copy" aria-label="Copy list"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="M8 7l4-4 4 4"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg></button></div>';
   h+='<div class="addpill"><input id="extra" placeholder="Add something else" autocomplete="off"><button data-act="add-extra" aria-label="Add">+</button></div>';
   if(data.staples.length){
@@ -975,7 +994,7 @@ function viewShop(){
     h+='<div class="empty"><h3>'+(sd?'All shopped for':'Nothing to buy yet')+'</h3><p class="muted" style="margin:0">'+(sd?'Every planned dinner in this range is already covered. Plan more dinners and the new ingredients appear here.':'Choose dinners on the Plan tab and the ingredients land here, merged and sorted by aisle.')+'</p><button class="btn" data-act="tab" data-tab="plan">Go to the plan</button></div>';
   }
   const exs=ex.slice().sort(function(a,b){return (a.done?1:0)-(b.done?1:0);});
-  if(exs.length)h+=ddHtml('added','Added by you',exs.filter(function(e){return !e.done;}).length,exs.map(function(e){return '<button class="mi'+(e.done?' done':'')+'" data-act="tick-extra" data-id="'+esc(e.id)+'"><span class="ico">'+iconFor(e.name,'Other')+'</span><span class="nm"><span class="t"><span class="cap">'+esc(e.name)+'</span></span></span><span class="cb">✓</span></button>';}).join(''),true);
+  if(exs.length)h+=ddHtml('added','Added by you',exs.filter(function(e){return !e.done;}).length,exs.map(function(e){return '<button class="mi'+(e.done?' done':'')+'" data-act="tick-extra" data-id="'+esc(e.id)+'"><span class="ico">'+iconFor(e.name,'Other')+'</span><span class="nm"><span class="t"><span class="cap">'+esc(e.name)+'</span></span></span><span class="cb">✓</span></button>';}).join(''),true,'<button class="clr" data-act="clear-extras">Clear</button>');
   data.aisles.forEach(function(a){
     const items=a.items.slice().sort(function(x,y){return (ck[x.key]?1:0)-(ck[y.key]?1:0);});
     h+='<div class="mgroup"><h3>'+esc(a.aisle)+'</h3>'+items.map(function(i){return shopItemHtml(i,!!ck[i.key],a.aisle);}).join('')+'</div>';
@@ -1195,22 +1214,30 @@ function openAddRecipe(){
 }
 
 // plan picker
-function openPicker(iso){
+function putPlan(iso,dinner,lunch){
+  const doc={date:iso};
+  if(dinner&&dinner.kind){doc.kind=dinner.kind;if(dinner.rid)doc.rid=dinner.rid;if(dinner.portions!=null&&dinner.portions!=='')doc.portions=dinner.portions;}
+  if(lunch&&lunch.kind)doc.lunch=lunch;
+  if(!doc.kind&&!doc.lunch)return write('plan/'+iso,null);
+  return write('plan/'+iso,doc);
+}
+function openPicker(iso,meal){
   const inf=dayInfo(S,iso);
-  openSheet({title:'Dinner for '+fmtDate(iso),cls:'tall',ctx:{iso:iso,q:''},
+  const L=meal==='lunch',act=L?'set-lunch':'set-dinner';
+  openSheet({title:(L?'Lunch for ':'Dinner for ')+fmtDate(iso),cls:'tall',ctx:{iso:iso,q:''},
     body:function(c){
       const list=Object.values(S.recipes).filter(function(r){return !c.q||r.name.toLowerCase().indexOf(c.q.toLowerCase())>=0;}).sort(function(a,b){
         const w=function(r){return inf.packedTomorrow.length&&(r.tags||[]).indexOf('leftovers')>=0?0:1;};
         return w(a)-w(b)||a.name.localeCompare(b.name);});
-      let h='<div class="note">'+inf.portions+' portions by default: '+inf.eaters.length+' tonight'+(inf.packedTomorrow.length?' + '+inf.packedTomorrow.length+' packed for tomorrow':'')+'. '+esc(inf.cook==='either'?'Either of you cooks.':PN[inf.cook]+' cooks.')+'</div>';
-      h+='<div class="two"><button class="btn ghost" data-act="set-dinner" data-date="'+iso+'" data-kind="takeaway">Takeaway</button><button class="btn ghost" data-act="set-dinner" data-date="'+iso+'" data-kind="out">Eating out</button></div>';
+      let h=L?'<div class="note">2 portions, as you’re both home.</div>':'<div class="note">'+inf.portions+' portions by default: '+inf.eaters.length+' tonight'+(inf.packedTomorrow.length?' + '+inf.packedTomorrow.length+' packed for tomorrow':'')+'. '+esc(inf.cook==='either'?'Either of you cooks.':PN[inf.cook]+' cooks.')+'</div>';
+      h+='<div class="two"><button class="btn ghost" data-act="'+act+'" data-date="'+iso+'" data-kind="takeaway">Takeaway</button><button class="btn ghost" data-act="'+act+'" data-date="'+iso+'" data-kind="out">Eating out</button></div>';
       if(Object.keys(S.recipes).length)h+='<input class="search" id="pk-q" placeholder="Search your recipes" value="'+esc(c.q)+'" autocomplete="off">';
       if(!list.length)h+='<div class="empty muted">'+(Object.keys(S.recipes).length?'Nothing matches.':'No recipes yet. Add some on the Recipes tab.')+'</div>';
       h+=list.map(function(r){
         const good=inf.packedTomorrow.length&&(r.tags||[]).indexOf('leftovers')>=0;
-        return '<button class="row" data-act="set-dinner" data-date="'+iso+'" data-kind="recipe" data-id="'+esc(r.id)+'"><span class="t">'+esc(r.name)+'</span><span class="m">'+(r.servings||2)+' portions'+(r.time?' · '+r.time+' min':'')+(good?' <span class="pill">Good for packed lunch</span>':'')+'</span></button>';
+        return '<button class="row" data-act="'+act+'" data-date="'+iso+'" data-kind="recipe" data-id="'+esc(r.id)+'"><span class="t">'+esc(r.name)+'</span><span class="m">'+(r.servings||2)+' portions'+(r.time?' · '+r.time+' min':'')+(good?' <span class="pill">Good for packed lunch</span>':'')+'</span></button>';
       }).join('');
-      if(S.plan[iso]&&S.plan[iso].kind)h+='<button class="btn danger" data-act="set-dinner" data-date="'+iso+'" data-kind="clear">Clear this dinner</button>';
+      if(L?(S.plan[iso]&&S.plan[iso].lunch):(S.plan[iso]&&S.plan[iso].kind))h+='<button class="btn danger" data-act="'+act+'" data-date="'+iso+'" data-kind="clear">Clear this '+(L?'lunch':'dinner')+'</button>';
       return h;
     }});
 }
@@ -1299,7 +1326,7 @@ function openRules(){
         h+='</div>';
       }
       if(STANDALONE)h+='<div class="sect"><h3>This device</h3><div class="small muted">Everything is saved on this device only. Copy a backup now and then, and paste it back to restore.</div><div class="row-actions"><button class="btn ghost sm" data-act="backup-copy">Copy backup</button><button class="btn ghost sm" data-act="backup-restore">Restore or add data</button>'+(SAMPLE?'<button class="btn ghost sm" data-act="forget-key">Remove API key</button>':'')+'</div></div>';
-      h+='<div class="small muted" style="text-align:center">Version 26 Nov, 23:00</div>';
+      h+='<div class="small muted" style="text-align:center">Version 26 Nov, 23:30</div>';
       return h;
     },
     foot:function(){return '<button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="save-rules">Save</button>';}});
@@ -1394,18 +1421,26 @@ const ACT={
   'set-dinner':function(el){
     if(!guardWrite())return;
     const iso=el.dataset.date,k=el.dataset.kind,old=S.plan[iso]||{};
-    if(k==='clear')write('plan/'+iso,null);
-    else if(k==='recipe')write('plan/'+iso,{date:iso,kind:'recipe',rid:el.dataset.id});
-    else write('plan/'+iso,{date:iso,kind:k});
+    if(k==='clear')putPlan(iso,null,old.lunch);
+    else if(k==='recipe')putPlan(iso,{kind:'recipe',rid:el.dataset.id},old.lunch);
+    else putPlan(iso,{kind:k},old.lunch);
     if(el.closest('.overlay'))closeSheet(el);
   },
+  'set-lunch':function(el){
+    if(!guardWrite())return;
+    const iso=el.dataset.date,k=el.dataset.kind,old=S.plan[iso]||{};
+    let lunch=null;
+    if(k==='recipe')lunch={kind:'recipe',rid:el.dataset.id};else if(k!=='clear')lunch={kind:k};
+    putPlan(iso,old,lunch);
+    if(el.closest('.overlay'))closeSheet(el);
+  },
+  'pick-lunch':function(el){if(guardWrite())openPicker(el.dataset.date,'lunch');},
   portions:function(el){
     if(!guardWrite())return;
     const iso=el.dataset.date,p=S.plan[iso];if(!p)return;
     const inf=dayInfo(S,iso),cur=(p.portions!=null&&p.portions!=='')?p.portions:inf.portions;
     const next=Math.max(1,Math.min(20,cur+Number(el.dataset.d)));
-    const doc={date:iso,kind:p.kind,rid:p.rid||null};if(next!==inf.portions)doc.portions=next;
-    write('plan/'+iso,doc);
+    putPlan(iso,{kind:p.kind,rid:p.rid||null,portions:next!==inf.portions?next:null},p.lunch);
   },
   'open-recipe':function(el){openRecipe(el.dataset.id);},
   rsv:function(el){const c=ctxOf(el);c.sv=Math.max(1,Math.min(24,c.sv+Number(el.dataset.d)));c.render();},
@@ -1429,7 +1464,7 @@ const ACT={
     const c=ctxOf(el),r=curRecipe(c);if(!r||!guardWrite())return;
     confirmBox('Delete “'+r.name+'”? Any days that use it will lose their dinner. This can’t be undone.','Delete',function(){
       write('recipes/'+r.id,null);
-      Object.values(S.plan).forEach(function(p){if(p.kind==='recipe'&&p.rid===r.id)write('plan/'+p.date,null);});
+      Object.values(S.plan).forEach(function(p){const dn=(p.kind==='recipe'&&p.rid===r.id),ln=(p.lunch&&p.lunch.kind==='recipe'&&p.lunch.rid===r.id);if(dn||ln)putPlan(p.date,dn?null:p,ln?null:p.lunch);});
       document.querySelectorAll('.overlay').forEach(function(o){o.remove();});toast('Recipe deleted');});
   },
   'add-recipe':function(){if(guardWrite())openAddRecipe();},
@@ -1563,6 +1598,7 @@ const ACT={
     const ck=Object.assign({},S.shop.checked||{}),k=el.dataset.key;if(ck[k])delete ck[k];else ck[k]=true;
     saveShop({checked:ck});
   },
+  'clear-extras':function(){if(!guardWrite())return;saveShop({extras:[]});toast('Cleared');},
   'tick-extra':function(el){
     if(!guardWrite())return;
     saveShop({extras:(S.shop.extras||[]).map(function(e){return e.id===el.dataset.id?Object.assign({},e,{done:!e.done}):e;})});
@@ -1576,14 +1612,14 @@ const ACT={
   'shop-finish':function(){
     if(!guardWrite())return;
     const sp=Object.assign({},S.shop.shopped||{});
-    shopDates().forEach(function(d){sp[d+':'+S.plan[d].rid]=true;});
+    shopDates().forEach(function(d){mealsOn(S,d).forEach(function(m){sp[m.key]=true;});});
     saveShop({shopped:sp,checked:{},extras:(S.shop.extras||[]).filter(function(e){return !e.done;})});
     toast('Done. Those dinners are marked as shopped for.');
   },
   'shop-reset':function(){
     if(!guardWrite())return;
     const sp=Object.assign({},S.shop.shopped||{});
-    shoppedDates().forEach(function(d){delete sp[d+':'+S.plan[d].rid];});
+    shoppedDates().forEach(function(d){mealsOn(S,d).forEach(function(m){delete sp[m.key];});});
     saveShop({shopped:sp});
   },
   'shop-copy':function(){
