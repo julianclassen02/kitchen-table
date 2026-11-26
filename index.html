@@ -460,11 +460,11 @@ function icsDate(v){
   return {date:m[1]+'-'+m[2]+'-'+m[3],time:m[4]?m[4]+':'+m[5]:null};
 }
 function parseICS(text){
-  const lines=String(text).replace(/\r\n?/g,'\n').replace(/\n[ \t]/g,'').split('\n');
+  const lines=String(text).replace(/^\uFEFF/,'').replace(/\r\n?/g,'\n').replace(/\n[ \t]/g,'').split('\n').map(function(l){return l.trim();});
   const evs=[];let cur=null;
   for(const ln of lines){
-    if(ln==='BEGIN:VEVENT'){cur={};continue;}
-    if(ln==='END:VEVENT'){if(cur)evs.push(cur);cur=null;continue;}
+    if(/^BEGIN:VEVENT$/i.test(ln)){cur={};continue;}
+    if(/^END:VEVENT$/i.test(ln)){if(cur)evs.push(cur);cur=null;continue;}
     if(!cur)continue;
     const i=ln.indexOf(':');if(i<0)continue;
     const name=ln.slice(0,i).split(';')[0].toUpperCase(),val=ln.slice(i+1).trim();
@@ -492,6 +492,16 @@ function parseICS(text){
     }
   }
   return Object.keys(byDate).sort().map(function(k){return {date:k,title:byDate[k].titles.join(' / ')};});
+}
+function diagnose(t){
+  const s=String(t||'').trim();
+  if(!s)return 'The file or box was empty.';
+  if(/^(https?:|webcal:)/i.test(s)&&s.indexOf('\n')<0)return 'That is the calendar link, not its contents. Open the link in a browser, then copy all the text it shows, or save the file it downloads.';
+  if(/<html|<!doctype/i.test(s.slice(0,300)))return 'That looks like a web page, not a calendar. Open the link in a browser and copy the calendar text instead.';
+  if(!/BEGIN:VCALENDAR/i.test(s))return 'This doesn’t look like calendar data. It should start with BEGIN:VCALENDAR. What I received starts with: '+s.slice(0,80);
+  const n=(s.match(/BEGIN:VEVENT/gi)||[]).length;
+  if(!n)return 'The calendar is valid but has no events in it ('+s.length+' characters read). The schedule may be empty right now.';
+  return 'Found '+n+' events but couldn’t read their dates. Send the first few lines to Claude so the reader can be fixed.';
 }
 function presetCandidates(title,dow,presets){
   const t=String(title||'').toLowerCase();
@@ -1097,12 +1107,13 @@ function openRules(){
 function openIcs(){
   openSheet({title:'Import shifts',cls:'tall',ctx:{text:'',res:null},
     body:function(c){
+      const dg=c.diag?'<div class="banner">'+esc(c.diag)+'</div>':'';
       if(c.res){
         const r=c.res;
         return '<div class="banner info"><b>'+r.found+' shift days found.</b> '+r.added+' new, '+r.kept+' left as you edited them'+(r.removed?', '+r.removed+' removed because they’re gone from the calendar':'')+'.</div>'
          +(r.need?'<div class="banner">'+r.need+' days need times. Tap them on the Plan or Shifts tab to pick a preset.</div>':'<div class="note good">Every day got times from your presets.</div>');
       }
-      return '<div class="note">Calendar links can’t be fetched live from this page. Export or copy your Rugged schedule and import it here. Run it again whenever the schedule changes. Days you’ve edited are never overwritten.</div>'
+      return dg+'<div class="note">Calendar links can’t be fetched live from this page. Export or copy your Rugged schedule and import it here. Run it again whenever the schedule changes. Days you’ve edited are never overwritten.</div>'
        +'<label class="opt" style="cursor:pointer"><span class="ic">⇪</span><span><b>Choose a .ics file</b><span>From Calendar, File, Export, or a downloaded feed.</span></span><input id="ics-file" type="file" accept=".ics,text/calendar,text/plain" hidden></label>'
        +'<div class="field"><label for="ics-text">Or paste the calendar text</label><textarea id="ics-text" data-bind="text" placeholder="BEGIN:VCALENDAR…" style="min-height:140px"></textarea></div>';
     },
@@ -1110,7 +1121,7 @@ function openIcs(){
 }
 async function applyIcs(c,text){
   const items=parseICS(text);
-  if(!items.length){toast('No events found in that text.');return;}
+  if(!items.length){c.diag=diagnose(text);c.render();return;}
   const today=todayISO();
   const P=S.settings.presets;
   let added=0,kept=0,need=0,removed=0;
