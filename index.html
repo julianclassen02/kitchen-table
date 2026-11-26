@@ -1182,7 +1182,8 @@ function openDay(iso){
     body:function(c){
       const d=c.d,P=S.settings.presets;
       const seg=function(path,opts,cur){return '<div class="seg" role="group">'+opts.map(function(o){return '<button data-act="segset" data-path="'+path+'" data-val="'+o[0]+'" aria-pressed="'+(cur===o[0])+'">'+o[1]+'</button>';}).join('')+'</div>';};
-      let h='<div class="sect"><h3 style="color:var(--j)">Julian</h3>'+seg('j',[['off','Off'],['work','Working']],d.j)+'<div style="margin-top:8px"><button class="chip" data-act="toggle-away" data-who="j" aria-pressed="'+(d.j==='away')+'">Away overnight</button></div>';
+      const head=function(nm,col,who,on){return '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><h3 style="color:'+col+';margin:0">'+nm+'</h3><button class="chip" style="padding:4px 10px;font-size:12px" data-act="toggle-away" data-who="'+who+'" aria-pressed="'+on+'">Away overnight</button></div>';};
+      let h='<div class="sect">'+head('Julian','var(--j)','j',d.j==='away')+seg('j',[['off','Off'],['work','Working']],d.j);
       if(d.j!=='off'){
         h+='<div class="two"><div class="field"><label for="d-leave">Leaves home</label><input id="d-leave" type="time" data-bind="leave" value="'+esc(d.leave)+'"></div>'
           +(d.j==='work'?'<div class="field"><label for="d-ret">Back home</label><input id="d-ret" type="time" data-bind="ret" value="'+esc(d.ret)+'"></div>':'<div class="field"><label for="d-back">Back home on</label><input id="d-back" type="date" min="'+addDays(iso,1)+'" data-bind="back" value="'+esc(d.back)+'"></div>')+'</div>';
@@ -1190,7 +1191,7 @@ function openDay(iso){
         h+='<label class="sw"><input type="checkbox" data-bind="food"'+(d.food?' checked':'')+'> Food provided on shift</label>';
         h+='<div class="field"><label for="d-title">Note</label><input id="d-title" data-bind="title" value="'+esc(d.title)+'" placeholder="PLS, TNT, OB…"></div>';
       }
-      h+='</div><div class="sect"><h3 style="color:var(--v)">Viv</h3>'+seg('vt',[['early','Early'],['late','Late'],['off','Off'],['holiday','Holiday'],['custom','Custom']],d.vt)+'<div style="margin-top:8px"><button class="chip" data-act="toggle-away" data-who="v" aria-pressed="'+(d.vt==='away')+'">Away overnight</button></div>';
+      h+='</div><div class="sect">'+head('Viv','var(--v)','v',d.vt==='away')+seg('vt',[['early','Early'],['late','Late'],['off','Off'],['holiday','Holiday'],['custom','Custom']],d.vt);
       if(d.vt==='away')h+='<div class="field"><label for="d-vback">Back home on (optional)</label><input id="d-vback" type="date" min="'+addDays(iso,1)+'" data-bind="vback" value="'+esc(d.vback)+'"></div>';
       if(d.vt==='custom')h+='<div class="two"><div class="field"><label for="d-vs">Starts</label><input id="d-vs" type="time" data-bind="vs" value="'+esc(d.vs)+'"></div><div class="field"><label for="d-ve">Finishes</label><input id="d-ve" type="time" data-bind="ve" value="'+esc(d.ve)+'"></div></div>';
       return h+'</div>';
