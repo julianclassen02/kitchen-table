@@ -1107,17 +1107,43 @@ function openRules(){
 function openIcs(){
   openSheet({title:'Import shifts',cls:'tall',ctx:{text:'',res:null},
     body:function(c){
-      const dg=c.diag?'<div class="banner">'+esc(c.diag)+'</div>':'';
+      if(c.busy)return '<div class="empty"><span class="spin"></span><b>Reading your calendar…</b></div>';
+      const dg=(c.diag?'<div class="banner">'+esc(c.diag)+'</div>':'')+(c.link&&/^https:\/\//.test(c.link)?'<a class="btn ghost" href="'+esc(c.link)+'" target="_blank" rel="noopener">Open the link</a>':'');
       if(c.res){
         const r=c.res;
         return '<div class="banner info"><b>'+r.found+' shift days found.</b> '+r.added+' new, '+r.kept+' left as you edited them'+(r.removed?', '+r.removed+' removed because they’re gone from the calendar':'')+'.</div>'
          +(r.need?'<div class="banner">'+r.need+' days need times. Tap them on the Plan or Shifts tab to pick a preset.</div>':'<div class="note good">Every day got times from your presets.</div>');
       }
-      return dg+'<div class="note">Calendar links can’t be fetched live from this page. Export or copy your Rugged schedule and import it here. Run it again whenever the schedule changes. Days you’ve edited are never overwritten.</div>'
-       +'<label class="opt" style="cursor:pointer"><span class="ic">⇪</span><span><b>Choose a .ics file</b><span>From Calendar, File, Export, or a downloaded feed.</span></span><input id="ics-file" type="file" accept=".ics,text/calendar,text/plain" hidden></label>'
-       +'<div class="field"><label for="ics-text">Or paste the calendar text</label><textarea id="ics-text" data-bind="text" placeholder="BEGIN:VCALENDAR…" style="min-height:140px"></textarea></div>';
+      return dg+'<div class="note">Paste your calendar link and the app reads it directly, then refreshes it for you now and then. If your browser blocks that, paste the calendar text instead. Days you’ve edited are never overwritten.</div>'
+       +'<label class="opt" style="cursor:pointer"><span class="ic">⇪</span><span><b>Or choose a .ics file</b><span>A downloaded calendar file.</span></span><input id="ics-file" type="file" accept=".ics,text/calendar,text/plain" hidden></label>'
+       +'<div class="field"><label for="ics-text">Paste the calendar link or text</label><textarea id="ics-text" data-bind="text" placeholder="https://… or BEGIN:VCALENDAR…" style="min-height:120px" autocapitalize="off" autocorrect="off" spellcheck="false"></textarea></div>'+(lsGet('kt-ics')?'<button class="btn soft block" data-act="ics-saved">Refresh from your saved link</button>':'');
     },
-    foot:function(c){return c.res?'<button class="btn" data-act="close">Done</button>':'<button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="ics-go">Import</button>';}});
+    foot:function(c){return c.busy?'':c.res?'<button class="btn" data-act="close">Done</button>':'<button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="ics-go">Import</button>';}});
+}
+async function fetchFeed(url){
+  const u=String(url).trim().replace(/^webcal:/i,'https:');
+  const r=await fetch(u,{cache:'no-store'});
+  if(!r.ok)throw {code:'http',status:r.status};
+  return await r.text();
+}
+async function importFromLink(c,url){
+  const u=String(url).trim().replace(/^webcal:/i,'https:');
+  c.busy=true;c.diag='';c.link='';c.render();
+  let t;
+  try{t=await fetchFeed(u);}
+  catch(e){
+    c.busy=false;c.link=u;
+    c.diag=(e&&e.code==='http')?'The calendar server answered with an error ('+e.status+'). Check the link is complete and still valid.':'This browser couldn’t read the link from inside the app. That usually means the calendar server doesn’t allow it. Open the link, copy all the text it shows, and paste that here instead.';
+    c.render();return;
+  }
+  lsSet('kt-ics',u);lsSet('kt-ics-at',String(Date.now()));
+  c.busy=false;
+  await applyIcs(c,t);
+}
+async function silentRefresh(){
+  const u=lsGet('kt-ics');if(!u)return;
+  if(Date.now()-Number(lsGet('kt-ics-at')||0)<3600e3)return;
+  try{const t=await fetchFeed(u);lsSet('kt-ics-at',String(Date.now()));await applyIcs({render:function(){}},t);}catch(e){}
 }
 async function applyIcs(c,text){
   const items=parseICS(text);
@@ -1258,7 +1284,13 @@ const ACT={
       persistLocal();document.querySelectorAll('.overlay').forEach(function(o){o.remove();});render(true);toast('Backup restored');});
   },
   'import-ics':function(){if(guardWrite())openIcs();},
-  'ics-go':function(el){const c=ctxOf(el);const t=c.text||'';if(!t.trim()){toast('Choose a file or paste the calendar text first.');return;}applyIcs(c,t);},
+  'ics-go':function(el){
+    const c=ctxOf(el);const t=String(c.text||'').trim();
+    if(!t){toast('Paste the calendar link or text first.');return;}
+    if(/^(https?|webcal):\/\/\S+$/i.test(t)){importFromLink(c,t);return;}
+    applyIcs(c,t);
+  },
+  'ics-saved':function(el){const c=ctxOf(el),u=lsGet('kt-ics');if(u)importFromLink(c,u);},
   horizon:function(el){saveShop({horizon:el.dataset.h==='all'?'all':Number(el.dataset.h)});},
   tick:function(el){
     if(!guardWrite())return;
@@ -1346,6 +1378,7 @@ async function init(){
     const k=lsGet('kt-key');
     if(k){SAMPLE=makeApiSample(k);try{SAMPLE_LIM=await SAMPLE.limits();}catch(e){}}
     if(lsGet('kt-probe')===null&&!lsSet('kt-probe','1'))S.noStore=true;
+    silentRefresh();
     if('serviceWorker' in navigator&&/^https?:/.test(location.protocol)){navigator.serviceWorker.register('sw.js').catch(function(){});}
   }
   render(true);
