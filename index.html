@@ -1328,8 +1328,8 @@ function openRules(){
         }
         h+='</div>';
       }
-      if(STANDALONE)h+='<div class="sect"><h3>This device</h3><div class="small muted">Everything is saved on this device only. Copy a backup now and then, and paste it back to restore.</div><div class="row-actions"><button class="btn ghost sm" data-act="backup-copy">Copy backup</button><button class="btn ghost sm" data-act="backup-restore">Restore or add data</button>'+(SAMPLE?'<button class="btn ghost sm" data-act="forget-key">Remove API key</button>':'')+'</div></div>';
-      h+='<div class="small muted" style="text-align:center">Version 26 Nov, 22:25</div>';
+      if(STANDALONE)h+='<div class="sect"><h3>This device</h3><div class="small muted">Everything is saved on this device only. Copy a backup now and then. Paste it into Import shifts to restore it.</div><div class="row-actions"><button class="btn ghost sm" data-act="backup-copy">Copy backup</button><button class="btn ghost sm" data-act="backup-restore">Import shifts</button>'+(SAMPLE?'<button class="btn ghost sm" data-act="forget-key">Remove API key</button>':'')+'</div></div>';
+      h+='<div class="small muted" style="text-align:center">Version 26 Nov, 22:35</div>';
       return h;
     },
     foot:function(){return '<button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="save-rules">Save</button>';}});
@@ -1552,8 +1552,8 @@ const ACT={
     try{navigator.clipboard.writeText(t).then(function(){toast('Backup copied. Paste it into Notes.');},fallback);}catch(e){fallback();}
   },
   'backup-restore':function(){
-    openSheet({title:'Restore or add data',ctx:{text:''},body:function(c){return '<div class="field"><label for="bk">Paste a backup, or shifts from Claude</label><textarea id="bk" data-bind="text" style="min-height:220px">'+esc(c.text||'')+'</textarea></div>';},
-      foot:function(){return '<button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="restore-go">Restore</button>';}});
+    openSheet({title:'Import shifts',ctx:{text:''},body:function(c){return '<div class="field"><label for="bk">Paste the shifts JSON Claude gave you (a full backup works too)</label><textarea id="bk" data-bind="text" style="min-height:220px">'+esc(c.text||'')+'</textarea></div>';},
+      foot:function(){return '<button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="restore-go">Import</button>';}});
   },
   'import-json':function(el){
     const o=el.closest('.overlay');if(o)o.remove();
