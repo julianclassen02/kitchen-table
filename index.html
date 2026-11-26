@@ -554,6 +554,104 @@ let DB=null,SAMPLE=null,SAMPLE_LIM=null,pendingRender=false,STANDALONE=false;
 function lsGet(k){try{return localStorage.getItem(k);}catch(e){return null;}}
 function lsSet(k,v){try{localStorage.setItem(k,v);return true;}catch(e){return false;}}
 function lsDel(k){try{localStorage.removeItem(k);}catch(e){}}
+
+// ---------- sync (optional shared database, one row per item) ----------
+const SY={cfg:null,base:{},busy:false,again:false,timer:null,status:'',last:0,dirty:false};
+function syLoad(){
+  try{SY.cfg=JSON.parse(lsGet('kt-sync')||'null');}catch(e){SY.cfg=null;}
+  try{SY.base=JSON.parse(lsGet('kt-sync-base')||'{}')||{};}catch(e){SY.base={};}
+}
+function syH(v){const t=JSON.stringify(v);let h=5381;for(let i=0;i<t.length;i++)h=((h<<5)+h+t.charCodeAt(i))|0;return t.length+':'+h;}
+function syItems(){
+  const o={};
+  Object.keys(S.recipes).forEach(function(k){o['r:'+k]=S.recipes[k];});
+  Object.keys(S.shifts).forEach(function(k){o['s:'+k]=S.shifts[k];});
+  Object.keys(S.plan).forEach(function(k){o['p:'+k]=S.plan[k];});
+  o['settings']=S.settings;o['shop']=S.shop;
+  return o;
+}
+function syApply(k,v){
+  if(k==='settings')S.settings=mergeSettings(v);
+  else if(k==='shop')S.shop=Object.assign({checked:{},extras:[],horizon:5,shopped:{}},v||{});
+  else{const m={r:S.recipes,s:S.shifts,p:S.plan}[k.charAt(0)];if(m)m[k.slice(2)]=v;}
+}
+function syRemove(k){const m={r:S.recipes,s:S.shifts,p:S.plan}[k.charAt(0)];if(m&&k.charAt(1)===':')delete m[k.slice(2)];}
+function syReq(path,opt){
+  const c=SY.cfg;opt=opt||{};
+  const hd={apikey:c.key,Authorization:'Bearer '+c.key};
+  Object.keys(opt.headers||{}).forEach(function(h){hd[h]=opt.headers[h];});
+  return fetch(c.url.replace(/\/+$/,'')+'/rest/v1/'+path,{method:opt.method||'GET',headers:hd,body:opt.body}).then(function(r){
+    if(!r.ok)return r.text().then(function(t){throw new Error(r.status+' '+t.slice(0,160));});
+    return opt.method&&opt.method!=='GET'?null:r.json();
+  });
+}
+async function syRun(){
+  if(!SY.cfg)return;
+  if(SY.busy){SY.again=true;return;}
+  SY.busy=true;SY.status='Syncing…';
+  try{
+    const code=encodeURIComponent(SY.cfg.code);
+    const rows=await syReq('kt_docs?select=k,data,updated_at&household=eq.'+code+'&limit=20000');
+    const remote={};rows.forEach(function(r){remote[r.k]=r;});
+    let local=syItems(),changed=false;
+    Object.keys(remote).forEach(function(k){
+      const r=remote[k],rh=syH(r.data),lh=(k in local)?syH(local[k]):null,b=SY.base[k];
+      if(lh===rh){SY.base[k]={h:rh,t:r.updated_at};return;}
+      const localEdited=lh!==null&&b&&b.h!==lh;
+      if(localEdited)return;
+      if(lh===null&&b&&b.h===rh)return;
+      syApply(k,r.data);SY.base[k]={h:rh,t:r.updated_at};changed=true;
+    });
+    Object.keys(SY.base).forEach(function(k){
+      if(k in remote)return;
+      const b=SY.base[k];
+      if(k in local&&syH(local[k])===b.h){syRemove(k);delete SY.base[k];changed=true;}
+      else if(k in local){delete SY.base[k];}
+    });
+    local=syItems();
+    const up=[],del=[],now=new Date().toISOString();
+    Object.keys(local).forEach(function(k){
+      const h=syH(local[k]),b=SY.base[k];
+      if(!b||b.h!==h)up.push({k:k,h:h});
+    });
+    Object.keys(SY.base).forEach(function(k){if(!(k in local))del.push(k);});
+    for(let i=0;i<up.length;i+=100){
+      const part=up.slice(i,i+100);
+      await syReq('kt_docs?on_conflict=household,k',{method:'POST',headers:{'Content-Type':'application/json',Prefer:'resolution=merge-duplicates,return=minimal'},
+        body:JSON.stringify(part.map(function(u){return {household:SY.cfg.code,k:u.k,data:local[u.k],updated_at:now};}))});
+      part.forEach(function(u){SY.base[u.k]={h:u.h,t:now};});
+    }
+    for(let i=0;i<del.length;i+=50){
+      const part=del.slice(i,i+50);
+      await syReq('kt_docs?household=eq.'+code+'&k=in.('+part.map(function(k){return '"'+k.replace(/"/g,'')+'"';}).join(',')+')',{method:'DELETE'});
+      part.forEach(function(k){delete SY.base[k];});
+    }
+    lsSet('kt-sync-base',JSON.stringify(SY.base));
+    if(changed){lsSet('kt-data',JSON.stringify({recipes:S.recipes,shifts:S.shifts,plan:S.plan,settings:S.settings,shop:S.shop}));SY.dirty=true;}
+    SY.status='ok';SY.last=Date.now();
+  }catch(e){SY.status='error: '+(e&&e.message||e);}
+  SY.busy=false;
+  if(SY.dirty&&!document.querySelector('.overlay')){SY.dirty=false;render(true);}
+  const sl=document.getElementById('sy-status');if(sl)sl.textContent=syLabel();
+  if(SY.again){SY.again=false;syKick();}
+}
+function syKick(){if(!SY.cfg)return;clearTimeout(SY.timer);SY.timer=setTimeout(syRun,700);}
+function syLabel(){
+  if(!SY.cfg)return 'Not connected';
+  if(SY.status==='ok')return 'Synced '+(Date.now()-SY.last<60000?'just now':Math.round((Date.now()-SY.last)/60000)+' min ago');
+  return SY.status||'Waiting…';
+}
+function syStart(){
+  syLoad();
+  const m=/^#kt=(.+)$/.exec(location.hash||'');
+  if(m){try{const c=JSON.parse(decodeURIComponent(escape(atob(m[1]))));if(c&&c.url&&c.key&&c.code){lsSet('kt-sync',JSON.stringify(c));SY.cfg=c;SY.base={};lsDel('kt-sync-base');}}catch(e){}
+    try{history.replaceState(null,'',location.pathname+location.search);}catch(e){}}
+  if(!SY.cfg)return;
+  syRun();
+  setInterval(function(){if(!document.hidden)syRun();},20000);
+  document.addEventListener('visibilitychange',function(){if(!document.hidden)syRun();});
+  window.addEventListener('online',syRun);
+}
 function applyBuiltins(){
   const titleOf=function(d){const sh=S.shifts[d];return sh&&sh.julian?sh.julian.title:'';};
   let n=0;
@@ -568,6 +666,7 @@ function applyBuiltins(){
   return n;
 }
 function persistLocal(){
+  syKick();
   if(!lsSet('kt-data',JSON.stringify({recipes:S.recipes,shifts:S.shifts,plan:S.plan,settings:S.settings,shop:S.shop}))&&!S.noStore){S.noStore=true;}
 }
 function loadLocal(){
@@ -1127,6 +1226,15 @@ function openRules(){
        +'<div class="field"><label for="r-cm">Commute (min)</label><input id="r-cm" type="number" inputmode="numeric" data-bind="commute" value="'+esc(d.commute)+'"></div></div>'
        +'<label class="sw"><input type="checkbox" data-bind="takeaway"'+(d.takeaway?' checked':'')+'> Suggest one takeaway a week on the busiest evening</label></div>';
       h+='<div class="sect"><h3>Staples</h3><div class="small muted">Always in the cupboard. They’re listed separately so they don’t clutter the shop.</div><div class="field"><textarea data-bind="staples" style="min-height:80px" aria-label="Staples">'+esc(d.staples)+'</textarea></div></div>';
+      if(STANDALONE){
+        h+='<div class="sect"><h3>Sync between devices</h3>';
+        if(SY.cfg){
+          h+='<div class="note good" id="sy-status">'+esc(syLabel())+'</div><div class="small muted">Recipes, shifts, plans and shopping ticks now match on every phone connected with the same code. Edits and deletes carry across.</div><div class="row-actions"><button class="btn ghost sm" data-act="sync-now">Sync now</button><button class="btn ghost sm" data-act="sync-link">Copy setup link for Viv</button><button class="btn ghost sm" data-act="sync-off">Disconnect</button></div>';
+        }else{
+          h+='<div class="small muted">Optional. Connect a free Supabase database so every phone sees the same data. Steps are in the README.</div><div class="field"><label for="sy-url">Project URL</label><input id="sy-url" class="inp" placeholder="https://xxxx.supabase.co" autocapitalize="off" autocorrect="off"></div><div class="field"><label for="sy-key">Anon public key</label><input id="sy-key" class="inp" autocapitalize="off" autocorrect="off" placeholder="eyJ…"></div><div class="field"><label for="sy-code">Household code (make one up, keep it private)</label><input id="sy-code" class="inp" autocapitalize="off" autocorrect="off" placeholder="e.g. a long random phrase"></div><button class="btn" data-act="sync-save">Connect</button>';
+        }
+        h+='</div>';
+      }
       if(STANDALONE)h+='<div class="sect"><h3>This device</h3><div class="small muted">Everything is saved on this device only. Copy a backup now and then, and paste it back to restore.</div><div class="row-actions"><button class="btn ghost sm" data-act="backup-copy">Copy backup</button><button class="btn ghost sm" data-act="backup-restore">Restore or add data</button>'+(SAMPLE?'<button class="btn ghost sm" data-act="forget-key">Remove API key</button>':'')+'</div></div>';
       return h;
     },
@@ -1288,6 +1396,20 @@ const ACT={
     d.vDays=(d.vDays||[]).map(Number);
     write('settings/main',d);closeSheet(el);toast('Rules saved');
   },
+  'sync-save':function(el){
+    const ov=el.closest('.overlay'),g=function(i){const x=$(i,ov);return x?x.value.trim():'';};
+    const c={url:g('#sy-url'),key:g('#sy-key'),code:g('#sy-code')};
+    if(!/^https?:\/\/[^\s]+$/.test(c.url)||c.key.length<20||c.code.length<8){toast('Fill in all three. The code needs at least 8 characters.');return;}
+    lsSet('kt-sync',JSON.stringify(c));lsDel('kt-sync-base');SY.cfg=c;SY.base={};SY.status='';
+    syStart();toast('Connected. Syncing…');closeSheet(el);
+  },
+  'sync-now':function(){syRun();toast('Syncing…');},
+  'sync-off':function(el){lsDel('kt-sync');lsDel('kt-sync-base');SY.cfg=null;SY.base={};clearTimeout(SY.timer);toast('Disconnected. Data stays on this device.');closeSheet(el);},
+  'sync-link':function(){
+    const u=location.origin+location.pathname+'#kt='+btoa(unescape(encodeURIComponent(JSON.stringify(SY.cfg))));
+    const fb=function(){openSheet({title:'Setup link',body:function(){return '<div class="field"><textarea readonly style="min-height:160px">'+esc(u)+'</textarea></div><div class="note">Send this to Viv. Opening it connects her phone.</div>';}});};
+    try{navigator.clipboard.writeText(u).then(function(){toast('Link copied. Send it to Viv.');},fb);}catch(e){fb();}
+  },
   'save-key':function(el){
     const inp=$('#p-key',el.closest('.overlay')),k=inp&&inp.value.trim();
     if(!k||k.indexOf('sk-')!==0){toast('That doesn’t look like an API key. It starts with sk-.');return;}
@@ -1418,7 +1540,7 @@ async function init(){
   }catch(e){}
   if(DB){subscribe();}
   else{
-    STANDALONE=true;loadLocal();applyBuiltins();
+    STANDALONE=true;loadLocal();applyBuiltins();syStart();
     const k=lsGet('kt-key');
     if(k){SAMPLE=makeApiSample(k);try{SAMPLE_LIM=await SAMPLE.limits();}catch(e){}}
     if(lsGet('kt-probe')===null&&!lsSet('kt-probe','1'))S.noStore=true;
