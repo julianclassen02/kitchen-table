@@ -139,6 +139,9 @@ h1,h2,h3{font-family:var(--font-display);margin:0;letter-spacing:-.01em;text-wra
 .seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
 .aisle{display:flex;flex-direction:column;gap:2px}
 .aisle h3{font-size:14px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-family:var(--font-body);font-weight:600;padding:6px 4px}
+.mgroup summary::-webkit-details-marker{display:none}
+.mgroup .dd{float:right;color:var(--accent);font-size:30px;line-height:.8;transition:transform .15s}
+.mgroup[open] .dd{transform:rotate(180deg)}
 .shop-head{display:flex;align-items:center;justify-content:space-between;margin-top:4px}
 .shop-head h2{font-size:26px}
 .addpill{display:flex;align-items:center;border:1.5px solid var(--line);border-radius:999px;background:var(--card);padding:0 6px 0 18px}
@@ -955,20 +958,20 @@ function viewShop(){
    +[[3,'3 days'],[5,'5 days'],[7,'7 days'],['all','All planned']].map(function(o){return '<button aria-pressed="'+(hz===o[0])+'" data-act="horizon" data-h="'+o[0]+'">'+o[1]+'</button>';}).join('')+'</div>';
   h+='<div class="shop-head"><h2>Shopping list ('+left+')</h2><button class="icon-btn" data-act="shop-copy" aria-label="Copy list"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="M8 7l4-4 4 4"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg></button></div>';
   h+='<div class="addpill"><input id="extra" placeholder="Add something else" autocomplete="off"><button data-act="add-extra" aria-label="Add">+</button></div>';
+  if(data.staples.length){
+    const st=data.staples.slice().sort(function(x,y){return (ck[x.key]?1:0)-(ck[y.key]?1:0);}),sl=st.filter(function(i){return !ck[i.key];}).length;
+    h+='<details class="mgroup"><summary style="cursor:pointer;font-family:var(--font-display);font-weight:600;font-size:21px;list-style:none;padding:4px 0">Check for pantry staples ('+sl+') <span class="dd">▾</span></summary><div style="margin-top:6px">'
+     +st.map(function(i){return shopItemHtml(i,!!ck[i.key],i.aisle);}).join('')+'</div></details>';
+  }
   if(!total&&!ex.length){
     h+='<div class="empty"><h3>'+(sd?'All shopped for':'Nothing to buy yet')+'</h3><p class="muted" style="margin:0">'+(sd?'Every planned dinner in this range is already covered. Plan more dinners and the new ingredients appear here.':'Choose dinners on the Plan tab and the ingredients land here, merged and sorted by aisle.')+'</p><button class="btn" data-act="tab" data-tab="plan">Go to the plan</button></div>';
   }
   const exs=ex.slice().sort(function(a,b){return (a.done?1:0)-(b.done?1:0);});
-  if(exs.length)h+='<div class="mgroup"><h3>Added by you</h3>'+exs.map(function(e){return '<button class="mi'+(e.done?' done':'')+'" data-act="tick-extra" data-id="'+esc(e.id)+'"><span class="ico">'+iconFor(e.name,'Other')+'</span><span class="nm"><span class="t"><span class="cap">'+esc(e.name)+'</span></span></span><span class="cb">✓</span></button>';}).join('')+'</div>';
+  if(exs.length)h+='<div class="mgroup"><div style="display:flex;align-items:center;justify-content:space-between"><h3>Added by you</h3><button class="btn ghost sm" style="padding:4px 12px;min-height:0;font-size:13px" data-act="clear-extras">Clear</button></div>'+exs.map(function(e){return '<button class="mi'+(e.done?' done':'')+'" data-act="tick-extra" data-id="'+esc(e.id)+'"><span class="ico">'+iconFor(e.name,'Other')+'</span><span class="nm"><span class="t"><span class="cap">'+esc(e.name)+'</span></span></span><span class="cb">✓</span></button>';}).join('')+'</div>';
   data.aisles.forEach(function(a){
     const items=a.items.slice().sort(function(x,y){return (ck[x.key]?1:0)-(ck[y.key]?1:0);});
     h+='<div class="mgroup"><h3>'+esc(a.aisle)+'</h3>'+items.map(function(i){return shopItemHtml(i,!!ck[i.key],a.aisle);}).join('')+'</div>';
   });
-  if(data.staples.length){
-    const st=data.staples.slice().sort(function(x,y){return (ck[x.key]?1:0)-(ck[y.key]?1:0);}),sl=st.filter(function(i){return !ck[i.key];}).length;
-    h+='<details class="mgroup"><summary style="cursor:pointer;font-family:var(--font-display);font-weight:600;font-size:21px;list-style:none;padding:4px 0">Check for pantry staples ('+sl+') <span class="muted" style="font-size:16px">▾</span></summary><div style="margin-top:6px">'
-     +st.map(function(i){return shopItemHtml(i,!!ck[i.key],i.aisle);}).join('')+'</div></details>';
-  }
   if(total||ex.length)h+='<div class="row-actions"><button class="btn soft sm" data-act="shop-finish">Finish shop</button></div>';
   if(sd)h+='<div class="small muted">Already shopped for '+sd+' dinner'+(sd>1?'s':'')+'. <button class="btn ghost sm" data-act="shop-reset" style="margin-left:4px">Show them again</button></div>';
   return h+'</div>';
@@ -1288,7 +1291,7 @@ function openRules(){
         h+='</div>';
       }
       if(STANDALONE)h+='<div class="sect"><h3>This device</h3><div class="small muted">Everything is saved on this device only. Copy a backup now and then, and paste it back to restore.</div><div class="row-actions"><button class="btn ghost sm" data-act="backup-copy">Copy backup</button><button class="btn ghost sm" data-act="backup-restore">Restore or add data</button>'+(SAMPLE?'<button class="btn ghost sm" data-act="forget-key">Remove API key</button>':'')+'</div></div>';
-      h+='<div class="small muted" style="text-align:center">Version 26 Nov, 22:20</div>';
+      h+='<div class="small muted" style="text-align:center">Version 26 Nov, 22:40</div>';
       return h;
     },
     foot:function(){return '<button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="save-rules">Save</button>';}});
@@ -1552,6 +1555,7 @@ const ACT={
     const ck=Object.assign({},S.shop.checked||{}),k=el.dataset.key;if(ck[k])delete ck[k];else ck[k]=true;
     saveShop({checked:ck});
   },
+  'clear-extras':function(){if(!guardWrite())return;saveShop({extras:[]});toast('Cleared');},
   'tick-extra':function(el){
     if(!guardWrite())return;
     saveShop({extras:(S.shop.extras||[]).map(function(e){return e.id===el.dataset.id?Object.assign({},e,{done:!e.done}):e;})});
