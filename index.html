@@ -955,7 +955,7 @@ function shopCount(){
 
 function viewShifts(){
   const start=addDays(todayISO(),S.shiftOff*14);
-  let h='<div class="stack"><div class="row-actions"><button class="btn ghost sm" data-act="rules">Rules</button></div>';
+  let h='<div class="stack"><div class="row-actions"><button class="btn ghost sm" data-act="rules">Settings</button></div>';
   h+='<div class="range"><b>'+esc(fmtShort(start)+' – '+fmtShort(addDays(start,13)))+'</b><span class="row-actions"><button class="icon-btn" data-act="shift-nav" data-d="-1" aria-label="Earlier"'+(S.shiftOff<=0?' disabled style="opacity:.35"':'')+'>‹</button><button class="icon-btn" data-act="shift-nav" data-d="1" aria-label="Later">›</button></span></div>';
   for(let i=0;i<14;i++){
     const iso=addDays(start,i),inf=dayInfo(S,iso),jl=jLabel(inf),vl=vLabel(inf);
@@ -1101,7 +1101,7 @@ function importPrompt(isImg,text){
 function importErr(e){
   const c=e&&e.code;
   if(c==='not_granted')return 'Allow Claude when asked, then try again.';
-  if(c==='bad_key')return 'That API key was rejected. Check it in the Rules screen and try again.';
+  if(c==='bad_key')return 'That API key was rejected. Check it in Settings and try again.';
   if(c==='rate_limited')return 'Too many requests for now. Try again in a few minutes.';
   if(c==='image_rejected')return 'That image couldn’t be used. Try a clearer screenshot.';
   if(c==='invalid_json'||c==='empty_completion'||c==='refused')return 'Couldn’t read a recipe from that. Try a clearer screenshot, or paste the text.';
@@ -1245,22 +1245,11 @@ function saveDay(c){
 // rules
 function openRules(){
   const d=clone(S.settings);
-  openSheet({title:'Rules',cls:'tall',ctx:{d:d},
+  openSheet({title:'Settings',cls:'tall',ctx:{d:d},
     body:function(c){
       const d=c.d;
       const days=[[1,'Mon'],[2,'Tue'],[3,'Wed'],[4,'Thu'],[5,'Fri'],[6,'Sat'],[0,'Sun']];
-      let h='<div class="sect"><h3 style="color:var(--v)">Viv’s rota</h3>'
-       +'<div class="two"><div class="field"><label for="r-anchor">A week that was…</label><input id="r-anchor" type="date" data-bind="vAnchor" value="'+esc(d.vAnchor)+'"></div>'
-       +'<div class="field"><label for="r-at">…early or late</label><select id="r-at" data-bind="vAnchorType"><option value="early"'+(d.vAnchorType==='early'?' selected':'')+'>Early week</option><option value="late"'+(d.vAnchorType==='late'?' selected':'')+'>Late week</option></select></div></div>'
-       +'<div class="small muted">Weeks alternate from there. Any date in that week works.</div>'
-       +'<div class="two"><div class="field"><label for="r-es">Early starts</label><input id="r-es" type="time" data-bind="vEarlyStart" value="'+esc(d.vEarlyStart)+'"></div><div class="field"><label for="r-ee">Early finishes</label><input id="r-ee" type="time" data-bind="vEarlyEnd" value="'+esc(d.vEarlyEnd)+'"></div></div>'
-       +'<div class="two"><div class="field"><label for="r-ls">Late starts</label><input id="r-ls" type="time" data-bind="vLateStart" value="'+esc(d.vLateStart)+'"></div><div class="field"><label for="r-le">Late finishes</label><input id="r-le" type="time" data-bind="vLateEnd" value="'+esc(d.vLateEnd)+'"></div></div>'
-       +'<div><span class="label">Works</span><div class="chips" style="flex-wrap:wrap;overflow:visible;margin-top:6px">'+days.map(function(x){return '<button class="chip" data-act="toggle-arr" data-path="vDays" data-val="'+x[0]+'" aria-pressed="'+(d.vDays.indexOf(x[0])>=0)+'">'+x[1]+'</button>';}).join('')+'</div></div>'
-       +'<label class="sw"><input type="checkbox" data-bind="vPacked"'+(d.vPacked?' checked':'')+'> Viv needs a packed meal on every work day</label></div>';
-      h+='<div class="sect"><h3>Dinner</h3><div class="three"><div class="field"><label for="r-dt">Dinner at</label><input id="r-dt" type="time" data-bind="dinnerTime" value="'+esc(d.dinnerTime)+'"></div>'
-       +'<div class="field"><label for="r-cb">Cooking (min)</label><input id="r-cb" type="number" inputmode="numeric" data-bind="cookBuffer" value="'+esc(d.cookBuffer)+'"></div>'
-       +'<div class="field"><label for="r-cm">Commute (min)</label><input id="r-cm" type="number" inputmode="numeric" data-bind="commute" value="'+esc(d.commute)+'"></div></div>'
-       +'<label class="sw"><input type="checkbox" data-bind="takeaway"'+(d.takeaway?' checked':'')+'> Suggest one takeaway a week on the busiest evening</label></div>';
+      let h='';
       h+='<div class="sect"><h3>Staples</h3><div class="small muted">Always in the cupboard. They’re listed separately so they don’t clutter the shop.</div><div class="field"><textarea data-bind="staples" style="min-height:80px" aria-label="Staples">'+esc(d.staples)+'</textarea></div></div>';
       if(STANDALONE){
         h+='<div class="sect"><h3>Sync between devices</h3>';
@@ -1272,10 +1261,10 @@ function openRules(){
         h+='</div>';
       }
       if(STANDALONE)h+='<div class="sect"><h3>This device</h3><div class="small muted">Everything is saved on this device only. Copy a backup now and then, and paste it back to restore.</div><div class="row-actions"><button class="btn ghost sm" data-act="backup-copy">Copy backup</button><button class="btn ghost sm" data-act="backup-restore">Restore or add data</button>'+(SAMPLE?'<button class="btn ghost sm" data-act="forget-key">Remove API key</button>':'')+'</div></div>';
-      h+='<div class="small muted" style="text-align:center">Version 26 Nov, 20:15</div>';
+      h+='<div class="small muted" style="text-align:center">Version 26 Nov, 20:40</div>';
       return h;
     },
-    foot:function(){return '<button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="save-rules">Save rules</button>';}});
+    foot:function(){return '<button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="save-rules">Save</button>';}});
 }
 
 // ics import
@@ -1458,7 +1447,7 @@ const ACT={
     const c=ctxOf(el),d=c.d;
     d.commute=Number(d.commute)||0;d.cookBuffer=Number(d.cookBuffer)||45;
     d.vDays=(d.vDays||[]).map(Number);
-    write('settings/main',d);closeSheet(el);toast('Rules saved');
+    write('settings/main',d);closeSheet(el);toast('Settings saved');
   },
   'sync-save':function(el){
     const ov=el.closest('.overlay'),g=function(i){const x=$(i,ov);return x?x.value.trim():'';};
