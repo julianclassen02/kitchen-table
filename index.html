@@ -532,6 +532,7 @@ function builtinPreset(titleOf,iso,dowOf_){
   const dow=dowOf_(iso);
   const prev=String(titleOf(addDays(iso,-1))||'').toLowerCase();
   const next=String(titleOf(addDays(iso,1))||'').toLowerCase();
+  if(/^\s*standby\s*$/.test(t))return {state:'off',leave:'',ret:'',food:false};
   const tntLike=/(^|[^a-z0-9])(tnt|ucl|uel|uecl|europa|champions|conference)([^a-z0-9]|$)/.test(t);
   if(/amazon/.test(t)){
     const first=!/amazon/.test(prev),last=!/amazon/.test(next);
