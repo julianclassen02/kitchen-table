@@ -580,7 +580,8 @@ function syReq(path,opt){
   const c=SY.cfg;opt=opt||{};
   const hd={apikey:c.key,Authorization:'Bearer '+c.key};
   Object.keys(opt.headers||{}).forEach(function(h){hd[h]=opt.headers[h];});
-  return fetch(c.url.replace(/\/+$/,'')+'/rest/v1/'+path,{method:opt.method||'GET',headers:hd,body:opt.body}).then(function(r){
+  let base=c.url;try{base=new URL(c.url).origin;}catch(e){}
+  return fetch(base+'/rest/v1/'+path,{method:opt.method||'GET',headers:hd,body:opt.body}).then(function(r){
     if(!r.ok)return r.text().then(function(t){throw new Error(r.status+' '+t.slice(0,160));});
     return opt.method&&opt.method!=='GET'?null:r.json();
   });
