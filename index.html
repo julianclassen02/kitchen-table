@@ -957,80 +957,8 @@ function viewRecipes(){
   return h+'</div>';
 }
 
-// Drawn icons for items with no emoji. Flat shapes on a 64 grid, same weight as the emoji tiles.
-const SV={};
-(function(){
-  function S(x){return '<svg viewBox="0 0 64 64" width="40" height="40" aria-hidden="true">'+x+'</svg>';}
-  function R(x,y,w,h,r,f,o){return '<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" rx="'+r+'" fill="'+f+'"'+(o?' opacity="'+o+'"':'')+'/>';}
-  function C(x,y,r,f){return '<circle cx="'+x+'" cy="'+y+'" r="'+r+'" fill="'+f+'"/>';}
-  function P(d,f,o){return '<path d="'+d+'" fill="'+f+'"'+(o?' opacity="'+o+'"':'')+'/>';}
-  const HL=function(x,y,h){return R(x,y,4,h,2,'#fff',.35);};
-  const g={
-    olive:function(){return '<ellipse cx="32" cy="39" rx="6" ry="4.5" fill="#6b8f3a"/>'+C(34,38,1.6,'#c0463a');},
-    drop:function(f){return P('M32 30 C28 36 26 39 26 42 a6 6 0 0 0 12 0 C38 39 36 36 32 30 Z',f||'#f5c518');},
-    tom:function(){return C(32,40,6.5,'#d8402f')+P('M28 34 l4 2 4-2 -2 3 h-4 z','#5d8a2e');},
-    bub:function(){return C(27,42,3.5,'#fff',.8)+C(35,38,4.5,'#fff')+C(36,46,2.5,'#fff');},
-    leaf:function(f){return P('M25 44 C25 34 33 31 40 32 C40 40 34 46 25 44 Z',f||'#5d8a2e');},
-    dot:function(f){return C(32,39,5,f||'#fff');}
-  };
-  function bottle(b,c,l,gl){return S(R(25,4,14,7,2,c)+R(27,10,10,10,2,b)+R(17,18,30,40,10,b)+R(17,30,30,20,0,l)+(gl||'')+HL(21,22,32));}
-  function jar(b,c,l,gl){return S(R(15,8,34,10,3,c)+R(13,16,38,42,9,b)+R(13,30,38,20,0,l)+(gl||'')+HL(17,22,30));}
-  function tin(b,l,gl){return S(R(14,12,36,44,5,'#b9c0c7')+R(14,18,36,32,0,b)+R(14,28,36,14,0,l)+(gl||'')+R(14,12,36,5,3,'#dfe4e8')+HL(18,20,28));}
-  function tube(b,c,st){return S(R(26,3,12,9,2,c)+P('M24 12 H40 L47 54 H17 Z',b)+(st?P('M23 26 H41 L42 34 H22 Z',st):'')+R(17,54,30,5,1.5,'#000',.18)+HL(25,16,32));}
-  function box(b,band,gl){return S(R(13,8,38,48,5,b)+R(13,24,38,18,0,band)+(gl||'')+HL(17,12,40));}
-  function bag(b,band,gl){return S(P('M15 14 H49 L51 57 H13 Z',b)+R(15,9,34,7,2,'#000',.15)+R(14,28,36,16,0,band)+(gl||'')+HL(19,18,34));}
-  function carton(b,band,gl){return S(P('M20 18 L32 5 L44 18 Z','#000',.2)+R(20,17,24,41,3,b)+R(20,30,24,16,0,band)+(gl||'')+HL(24,21,34));}
-  function spray(b,h,gl){return S(R(15,12,10,5,2,h)+R(21,8,24,12,4,h)+R(28,19,10,8,2,b)+R(17,26,28,32,8,b)+(gl||'')+HL(21,30,24));}
-  function pot(b,c,gl){return S(P('M17 21 H47 L43 57 H21 Z',b)+R(14,14,36,8,3,c)+(gl||'')+HL(21,26,26));}
-  SV.toothpaste=tube('#eef3f7','#2f80d0','#2f80d0');
-  SV.tubetom=tube('#d8402f','#f2f2f2','#f2c94c');
-  SV.oliveoil=bottle('#7a9a3b','#2f4f1f','#f3ecc9',g.olive());
-  SV.oil=bottle('#e8b923','#b8860b','#fff6cc',g.drop('#e8a50c'));
-  SV.vinegar=bottle('#a86b3c','#5a3a1f','#f3e6d0',g.dot('#a86b3c'));
-  SV.ketchup=bottle('#d8402f','#2d7d3a','#fff',g.tom());
-  SV.soy=bottle('#3b2a22','#c0392b','#e9dcc3',g.dot('#3b2a22'));
-  SV.mustard=bottle('#e3b520','#c0392b','#fff2b3',g.dot('#e3b520'));
-  SV.water=bottle('#7ec3ec','#2f80d0','#dff1fb',g.drop('#4a9fd8'));
-  SV.squash=bottle('#f0902f','#2d7d3a','#ffe6c4',g.dot('#f0902f'));
-  SV.washup=bottle('#52b788','#2d7d5a','#e1f5ea',g.bub());
-  SV.mouthwash=bottle('#4cc3b5','#2b8f84','#dff6f3',g.drop('#2b8f84'));
-  SV.bleach=bottle('#e9f1f7','#2f80d0','#bcd9f0',g.dot('#2f80d0'));
-  SV.pastasauce=jar('#d8402f','#d8d8d8','#f6e7c8',g.tom());
-  SV.mayo=jar('#f7efd6','#d8402f','#fff',g.dot('#f2c94c'));
-  SV.peanutbutter=jar('#c98a4b','#8a5a2b','#f3d9a8',g.dot('#8a5a2b'));
-  SV.jam=jar('#b3294a','#d8d8d8','#f7e1e6',g.dot('#b3294a'));
-  SV.kimchi=jar('#e2573a','#f2f2f2','#fff',g.leaf('#5d8a2e'));
-  SV.pickle=jar('#8fb04a','#d8d8d8','#eef3d8',g.leaf('#5d8a2e'));
-  SV.chopped=tin('#d8402f','#fff',g.tom());
-  SV.bean=tin('#c98a4b','#fff',g.dot('#8a4b2b'));
-  SV.petfood=tin('#8a6a4b','#f3d9a8',g.dot('#8a6a4b'));
-  SV.cider=S(R(18,8,28,48,6,'#d9a441')+R(18,8,28,6,3,'#dfe4e8')+R(18,50,28,6,3,'#dfe4e8')+R(18,24,28,16,0,'#7a3b1f')+C(32,32,5,'#f4d9a0')+HL(22,16,34));
-  SV.cereal=box('#f0902f','#fff2d6',g.dot('#c9772b'));
-  SV.dishtabs=box('#3b9ede','#e3f3fc',g.bub());
-  SV.laundry=box('#3b9ede','#fff',g.bub());
-  SV.tissue=S(P('M24 18 C26 8 34 8 33 18 C36 10 42 12 40 20 Z','#fff')+R(10,18,44,38,6,'#7ec3ec')+R(22,28,20,12,6,'#fff',.8)+HL(14,22,30));
-  SV.flour=bag('#f3ece0','#fff',g.leaf('#c9a86a'));
-  SV.sugar=bag('#f7f7f7','#7ec3ec',g.dot('#fff'));
-  SV.oats=bag('#d9b97a','#fff2cf',g.leaf('#8a6a2b'));
-  SV.crisps=bag('#f2c230','#d8402f',g.dot('#f2c230'));
-  SV.binbag=S(P('M18 16 H46 L52 56 H12 Z','#2c2f33')+P('M24 16 C24 8 40 8 40 16 Z','#2c2f33')+R(26,13,12,4,2,'#d8402f')+HL(18,24,26));
-  SV.cream=carton('#f7efd6','#fff',g.dot('#7ec3ec'));
-  SV.passata=carton('#d8402f','#f6e7c8',g.tom());
-  SV.yoghurt=pot('#f7f7f7','#7ec3ec',g.dot('#d8402f'));
-  SV.spray=spray('#4cc3b5','#d8402f',g.bub());
-  SV.stockcube=S(R(10,30,22,22,4,'#d9a441')+R(32,24,22,22,4,'#e8b95a')+R(20,10,22,22,4,'#c98a2b')+R(14,34,5,14,2,'#fff',.35)+R(36,28,5,14,2,'#fff',.35)+R(24,14,5,14,2,'#fff',.35));
-  SV.grinder=S(C(32,9,5,'#3b2a22')+R(24,13,16,6,2,'#d8d8d8')+P('M24 19 H40 L44 56 H20 Z','#5a3a1f')+R(20,52,24,6,2,'#3b2a22')+R(26,30,12,6,0,'#8a6a4b',.7)+HL(26,24,26));
-  SV.sausage=S('<g transform="rotate(-25 32 32)">'+R(6,17,52,15,7.5,'#b5532f')+R(6,35,52,15,7.5,'#c4623b')+R(12,20,24,3,1.5,'#fff',.3)+R(12,38,24,3,1.5,'#fff',.3)+'</g>');
-  SV.salmon=S(P('M6 34 C14 16 40 12 58 26 C50 44 24 52 6 34 Z','#f08a6a')+P('M14 32 C24 22 38 20 50 27','none')+'<g fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" opacity=".7"><path d="M18 34 C26 24 38 22 48 28"/><path d="M20 40 C28 32 38 30 46 34"/></g>');
-  SV.asparagus=S('<g transform="rotate(8 32 32)">'+R(12,18,8,40,3,'#6b9a3a')+R(28,12,8,46,3,'#7fb046')+R(44,20,8,38,3,'#6b9a3a')+P('M10 22 C10 10 22 10 22 22 Z','#4f7f2a')+P('M26 16 C26 4 38 4 38 16 Z','#5f9433')+P('M42 24 C42 12 54 12 54 24 Z','#4f7f2a')+'</g>');
-  SV.springonion=S(R(18,26,7,30,3,'#f4f4e8')+R(29,22,7,34,3,'#f4f4e8')+R(40,28,7,28,3,'#f4f4e8')+P('M18 28 L14 6 H22 L25 28 Z','#5d9a3a')+P('M29 24 L29 4 H37 L36 24 Z','#6bb044')+P('M40 30 L44 8 H51 L47 30 Z','#5d9a3a'));
-  SV.lime=S(C(32,32,24,'#7fb23a')+C(32,32,19,'#e8f3b0')+'<g stroke="#7fb23a" stroke-width="2.5" stroke-linecap="round"><path d="M32 14V50M14 32H50M19 19L45 45M45 19L19 45"/></g>'+C(32,32,3,'#7fb23a'));
-  SV.shallot=S(P('M32 6 C34 14 36 16 42 22 C52 30 50 52 32 56 C14 52 12 30 22 22 C28 16 30 14 32 6 Z','#b86a8f')+P('M32 14 C30 26 28 40 32 56','none')+'<g fill="none" stroke="#fff" stroke-width="2" opacity=".45"><path d="M32 16 C26 30 26 44 32 54"/><path d="M32 16 C38 30 38 44 32 54"/></g>');
-})();
 // Only exact matches get a picture; '' entries block a looser match below (no icon is better than a misleading one).
 const ICONS=[
-
-['olive oil','svg:oliveoil'],['vegetable oil','svg:oil'],['sunflower oil','svg:oil'],['rapeseed oil','svg:oil'],['cooking oil','svg:oil'],['toothpaste','svg:toothpaste'],['mouthwash','svg:mouthwash'],['tomato puree','svg:tubetom'],['tomato paste','svg:tubetom'],['passata','svg:passata'],['chopped tomato','svg:chopped'],['tinned tomato','svg:chopped'],['canned tomato','svg:chopped'],['ketchup','svg:ketchup'],['soy sauce','svg:soy'],['pasta sauce','svg:pastasauce'],['mayonnaise','svg:mayo'],['mustard','svg:mustard'],['peanut butter','svg:peanutbutter'],['jam','svg:jam'],['kimchi','svg:kimchi'],['pickle','svg:pickle'],['gherkin','svg:pickle'],['caper','svg:pickle'],['vinegar','svg:vinegar'],['stock cube','svg:stockcube'],['bouillon','svg:stockcube'],['black pepper','svg:grinder'],['peppercorn','svg:grinder'],['baked beans','svg:bean'],['dog food','svg:petfood'],['cat food','svg:petfood'],['cider','svg:cider'],['squash','svg:squash'],['water','svg:water'],['washing up','svg:washup'],['dishwasher','svg:dishtabs'],['bleach','svg:bleach'],['spray','svg:spray'],['cleaner','svg:spray'],['laundry','svg:laundry'],['detergent','svg:laundry'],['washing powder','svg:laundry'],['washing liquid','svg:laundry'],['bin bag','svg:binbag'],['bin liner','svg:binbag'],['tissue','svg:tissue'],['cereal','svg:cereal'],['porridge','svg:oats'],['oats','svg:oats'],['flour','svg:flour'],['sugar','svg:sugar'],['crisps','svg:crisps'],['cream cheese',''],['double cream','svg:cream'],['single cream','svg:cream'],['soured cream','svg:cream'],['yoghurt','svg:yoghurt'],['yogurt','svg:yoghurt'],['sausage','svg:sausage'],['salmon','svg:salmon'],['asparagus','svg:asparagus'],['spring onion','svg:springonion'],['lime','svg:lime'],['shallot','svg:shallot'],
 ['stock',''],['stock cube',''],['bouillon',''],['paste',''],['puree',''],['sauce',''],['oil',''],['vinegar',''],['peanut butter',''],['coconut milk',''],['coconut oil',''],['oat milk',''],['almond milk',''],['soy milk',''],['lemon juice',''],['garlic bread',''],['egg noodle',''],['breadcrumb',''],['black pepper',''],['ice cream','🍦'],['rice noodle','🍜'],
 ['toilet roll','🧻'],['toilet paper','🧻'],['loo roll','🧻'],['kitchen roll','🧻'],['kitchen towel','🧻'],['soap','🧼'],['hand wash','🧼'],['sponge','🧽'],['shampoo','🧴'],['conditioner','🧴'],['lotion','🧴'],['sun cream','🧴'],['toothbrush','🪥'],['razor','🪒'],['plaster','🩹'],['painkiller','💊'],['paracetamol','💊'],['ibuprofen','💊'],['vitamin','💊'],['battery','🔋'],['batteries','🔋'],['light bulb','💡'],['candle','🕯️'],['flower','💐'],
 ['coffee','☕'],['tea','🫖'],['beer','🍺'],['lager','🍺'],['prosecco','🥂'],['champagne','🥂'],['juice','🧃'],['cola','🥤'],['chocolate','🍫'],['biscuit','🍪'],['cookie','🍪'],['cake','🍰'],['popcorn','🍿'],['honey','🍯'],['peanut','🥜'],['nuts','🥜'],['coconut','🥥'],
@@ -1042,7 +970,7 @@ const ICON_C={};
 function ICON_RX(k){return ICON_C[k]||(ICON_C[k]=new RegExp('\\b'+k.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')));}
 function iconFor(name){
   const n=String(name||'').toLowerCase();
-  for(const k of ICONS){if(ICON_RX(k[0]).test(n)){const v=k[1];return v.indexOf('svg:')===0?(SV[v.slice(4)]||''):v;}}
+  for(const k of ICONS){if(ICON_RX(k[0]).test(n))return k[1];}
   return '';
 }
 function shopItemHtml(it,done,aisle){
