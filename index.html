@@ -842,8 +842,8 @@ function dayCard(iso){
   let h='<article class="card day'+(today?' today':'')+'">';
   h+='<div class="day-head"><b>'+esc(fmtDate(iso))+'</b>'+(today?'<span class="pill">Today</span>':'')+'</div>';
   h+='<div class="people">'
-    +'<button class="who '+(jl.cls==='need'?'need':jl.cls==='off'?'off':'j')+'" data-act="edit-day" data-date="'+iso+'"><small>Julian</small><span>'+esc(jl.t)+'</span></button>'
-    +'<button class="who '+(vl.cls==='off'?'off':'v')+'" data-act="edit-day" data-date="'+iso+'"><small>Viv</small><span>'+esc(vl.t)+'</span></button></div>';
+    +'<button class="who '+(jl.cls==='need'?'need':jl.cls==='off'?'off':'j')+'" data-act="edit-day" data-who="j" data-date="'+iso+'"><small>Julian</small><span>'+esc(jl.t)+'</span></button>'
+    +'<button class="who '+(vl.cls==='off'?'off':'v')+'" data-act="edit-day" data-who="v" data-date="'+iso+'"><small>Viv</small><span>'+esc(vl.t)+'</span></button></div>';
   if(iso>=todayISO()){
     const pl=inf.packedTomorrow,tc=dinnerCovers(S,iso),tp=S.plan[iso],tm=addDays(iso,1);
     const ov=(S.settings.lunchOv||{})[tm];
@@ -953,8 +953,8 @@ function viewShifts(){
   h+='<div class="range"><b>'+esc(fmtShort(start)+' – '+fmtShort(addDays(start,13)))+'</b><span class="row-actions"><button class="icon-btn" data-act="shift-nav" data-d="-1" aria-label="Earlier"'+(S.shiftOff<=0?' disabled style="opacity:.35"':'')+'>‹</button><button class="icon-btn" data-act="shift-nav" data-d="1" aria-label="Later">›</button></span></div>';
   for(let i=0;i<14;i++){
     const iso=addDays(start,i),inf=dayInfo(S,iso),jl=jLabel(inf),vl=vLabel(inf);
-    h+='<button class="shiftrow'+(iso===todayISO()?' today':'')+'" data-act="edit-day" data-date="'+iso+'"><span class="d"><b>'+DAYN[dowOf(iso)]+'</b>'+esc(fmtShort(iso))+'</span>'
-      +'<span class="cell '+jl.cls+'"><small>Julian</small>'+esc(jl.t)+'</span><span class="cell '+vl.cls+'"><small>Viv</small>'+esc(vl.t)+'</span></button>';
+    h+='<div class="shiftrow'+(iso===todayISO()?' today':'')+'"><span class="d"><b>'+DAYN[dowOf(iso)]+'</b>'+esc(fmtShort(iso))+'</span>'
+      +'<button class="cell '+jl.cls+'" style="border:0;text-align:left;font-family:inherit" data-act="edit-day" data-who="j" data-date="'+iso+'"><small>Julian</small>'+esc(jl.t)+'</button><button class="cell '+vl.cls+'" style="border:0;text-align:left;font-family:inherit" data-act="edit-day" data-who="v" data-date="'+iso+'"><small>Viv</small>'+esc(vl.t)+'</button></div>';
   }
   return h+'</div>';
 }
@@ -1172,13 +1172,13 @@ function openPicker(iso){
 }
 
 // day editor
-function openDay(iso){
+function openDay(iso,who){
   const sh=S.shifts[iso]||{};
   const J=Object.assign({state:'off',leave:'',ret:'',food:false,title:'',preset:''},sh.julian||{});
   const v=sh.viv||null;
   const rt=vOf({settings:S.settings,shifts:iso in S.shifts?{[iso]:{julian:(S.shifts[iso]||{}).julian}}:{}},iso).type;
   const d={j:J.state,leave:J.leave,ret:J.ret,food:J.food,title:J.title,back:'',backRet:'',vt:v?v.type:rt,vprev:rt,vback:'',vs:v&&v.start||'',ve:v&&v.end||'',preset:J.preset};
-  openSheet({title:fmtDate(iso),cls:'tall',ctx:{iso:iso,d:d},
+  openSheet({title:fmtDate(iso)+(who==='j'?' · Julian':who==='v'?' · Viv':''),cls:who?'':'tall',ctx:{iso:iso,d:d,who:who},
     body:function(c){
       const d=c.d,P=S.settings.presets;
       const seg=function(path,opts,cur){return '<div class="seg" role="group">'+opts.map(function(o){return '<button data-act="segset" data-path="'+path+'" data-val="'+o[0]+'" aria-pressed="'+(cur===o[0])+'">'+o[1]+'</button>';}).join('')+'</div>';};
@@ -1191,38 +1191,42 @@ function openDay(iso){
         h+='<label class="sw"><input type="checkbox" data-bind="food"'+(d.food?' checked':'')+'> Food provided on shift</label>';
         h+='<div class="field"><label for="d-title">Note</label><input id="d-title" data-bind="title" value="'+esc(d.title)+'" placeholder="PLS, TNT, OB…"></div>';
       }
-      h+='</div><div class="sect">'+head('Viv','var(--v)','v',d.vt==='away')+seg('vt',[['early','Early'],['late','Late'],['off','Off'],['holiday','Holiday'],['custom','Custom']],d.vt);
+      const jh=h+'</div>';
+      h='<div class="sect">'+head('Viv','var(--v)','v',d.vt==='away')+seg('vt',[['early','Early'],['late','Late'],['off','Off'],['holiday','Holiday'],['custom','Custom']],d.vt);
       if(d.vt==='away')h+='<div class="field"><label for="d-vback">Back home on (optional)</label><input id="d-vback" type="date" min="'+addDays(iso,1)+'" data-bind="vback" value="'+esc(d.vback)+'"></div>';
       if(d.vt==='custom')h+='<div class="two"><div class="field"><label for="d-vs">Starts</label><input id="d-vs" type="time" data-bind="vs" value="'+esc(d.vs)+'"></div><div class="field"><label for="d-ve">Finishes</label><input id="d-ve" type="time" data-bind="ve" value="'+esc(d.ve)+'"></div></div>';
-      return h+'</div>';
+      const vh=h+'</div>';
+      return c.who==='j'?jh:c.who==='v'?vh:jh+vh;
     },
     foot:function(){return '<button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="save-day">Save</button>';}});
 }
 function rtOf(iso,jul){const sh={};if(jul)sh[iso]={julian:jul};return vOf({settings:S.settings,shifts:sh},iso).type;}
 function saveDay(c){
-  const d=c.d,iso=c.iso,ov=c.ov;
+  const d=c.d,iso=c.iso,ov=c.ov,who=c.who;
   const old=S.shifts[iso]||{};
   let julian;
-  if(d.j==='off')julian={state:'off'};
+  if(who==='v')julian=old.julian||null;
+  else if(d.j==='off')julian={state:'off'};
   else julian={state:d.j,leave:d.leave||'',ret:d.j==='work'?(d.ret||''):'',food:!!d.food,title:d.title||'',preset:d.preset||'',edited:true,src:(old.julian&&old.julian.src)||''};
   let viv=null;
-  if(d.vt!==rtOf(iso,julian)){viv={type:d.vt};if(d.vt==='custom'){viv.start=d.vs||'09:00';viv.end=d.ve||'17:00';}}
-  if(d.j==='work'&&!d.leave&&!d.ret){toast('Add the time you leave and the time you’re back.');return;}
-  if(d.j==='away'&&d.back&&!d.backRet){toast('Add the time you’re home on the last day.');return;}
+  if(who==='j')viv=old.viv||null;
+  else if(d.vt!==rtOf(iso,julian)){viv={type:d.vt};if(d.vt==='custom'){viv.start=d.vs||'09:00';viv.end=d.ve||'17:00';}}
+  if(who!=='v'&&d.j==='work'&&!d.leave&&!d.ret){toast('Add the time you leave and the time you’re back.');return;}
+  if(who!=='v'&&d.j==='away'&&d.back&&!d.backRet){toast('Add the time you’re home on the last day.');return;}
   const put=function(date,jul,vv){
     const doc={date:date};if(jul)doc.julian=jul;if(vv)doc.viv=vv;
     if((!jul||jul.state==='off')&&!vv)return write('shifts/'+date,null);
     return write('shifts/'+date,doc);
   };
   const jobs=[put(iso,julian,viv)];
-  if(d.j==='away'&&d.back&&d.back>iso){
+  if(who!=='v'&&d.j==='away'&&d.back&&d.back>iso){
     for(let x=addDays(iso,1);x<=d.back&&x<=addDays(iso,30);x=addDays(x,1)){
       const ex=S.shifts[x]||{};
       const jul=(x===d.back)?{state:'work',leave:'',ret:d.backRet||'',food:true,title:d.title||'',edited:true}:{state:'away',leave:'',ret:'',food:true,title:d.title||'',edited:true};
       jobs.push(put(x,jul,ex.viv||null));
     }
   }
-  if(d.vt==='away'&&d.vback&&d.vback>iso){
+  if(who!=='j'&&d.vt==='away'&&d.vback&&d.vback>iso){
     for(let x=addDays(iso,1);x<d.vback&&x<=addDays(iso,30);x=addDays(x,1)){
       const ex=S.shifts[x]||{};
       jobs.push(put(x,ex.julian||null,{type:'away'}));
@@ -1262,7 +1266,7 @@ function openRules(){
         h+='</div>';
       }
       if(STANDALONE)h+='<div class="sect"><h3>This device</h3><div class="small muted">Everything is saved on this device only. Copy a backup now and then, and paste it back to restore.</div><div class="row-actions"><button class="btn ghost sm" data-act="backup-copy">Copy backup</button><button class="btn ghost sm" data-act="backup-restore">Restore or add data</button>'+(SAMPLE?'<button class="btn ghost sm" data-act="forget-key">Remove API key</button>':'')+'</div></div>';
-      h+='<div class="small muted" style="text-align:center">Version 26 Nov, 19:05</div>';
+      h+='<div class="small muted" style="text-align:center">Version 26 Nov, 19:20</div>';
       return h;
     },
     foot:function(){return '<button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="save-rules">Save rules</button>';}});
@@ -1352,7 +1356,7 @@ const ACT={
   'confirm-ok':function(el){const c=ctxOf(el);closeSheet(el);if(c&&c.ok)c.ok();},
   'plan-nav':function(el){S.planOff=Math.max(0,S.planOff+Number(el.dataset.d));render(true);view.scrollTop=0;},
   'shift-nav':function(el){S.shiftOff=Math.max(0,S.shiftOff+Number(el.dataset.d));render(true);view.scrollTop=0;},
-  'edit-day':function(el){if(guardWrite())openDay(el.dataset.date);},
+  'edit-day':function(el){if(guardWrite())openDay(el.dataset.date,el.dataset.who);},
   'pick-dinner':function(el){if(guardWrite())openPicker(el.dataset.date);},
   'set-dinner':function(el){
     if(!guardWrite())return;
