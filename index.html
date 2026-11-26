@@ -212,6 +212,14 @@ details.card summary{cursor:pointer;font-weight:600}
 .sw input{width:26px;height:26px;accent-color:var(--accent)}
 .sect{display:flex;flex-direction:column;gap:10px;padding:14px;background:var(--card);border:1px solid var(--line);border-radius:16px}
 .sect h3{font-size:17px}
+.set-lbl{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600;margin:6px 4px -4px}
+.set-hd{display:flex;gap:12px;align-items:flex-start}
+.set-hd b{display:block;font-family:var(--font-display);font-size:17px}
+.set-hd span span{font-size:13px;color:var(--muted)}
+.set-hd .ic{flex:none;width:40px;height:40px;border-radius:12px;background:var(--accent-soft);color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:20px}
+.tri{display:grid;grid-template-columns:1fr 1.4fr 1fr;gap:8px}
+.tri .btn{padding:10px 6px;font-size:14px}
+.btn.danger{color:#b3261e}
 .opt{display:flex;gap:12px;align-items:center;text-align:left;width:100%;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px}
 .opt b{display:block;font-family:var(--font-display);font-size:17px}
 .opt span{font-size:13px;color:var(--muted)}
@@ -1318,18 +1326,21 @@ function openRules(){
       const d=c.d;
       const days=[[1,'Mon'],[2,'Tue'],[3,'Wed'],[4,'Thu'],[5,'Fri'],[6,'Sat'],[0,'Sun']];
       let h='';
-      h+='<div class="sect"><h3>Staples</h3><div class="small muted">Always in the cupboard. They’re listed separately so they don’t clutter the shop.</div><div class="field"><textarea data-bind="staples" style="min-height:80px" aria-label="Staples">'+esc(d.staples)+'</textarea></div></div>';
+      h+='<div class="set-lbl">Shopping</div>';
+      h+='<div class="sect"><div class="set-hd"><span class="ic">🧂</span><span><b>Staples</b><span>Always in the cupboard. They’re listed separately so they don’t clutter the shop.</span></span></div><div class="field"><textarea data-bind="staples" style="min-height:84px" aria-label="Staples">'+esc(d.staples)+'</textarea></div></div>';
       if(STANDALONE){
-        h+='<div class="sect"><h3>Sync between devices</h3>';
+        h+='<div class="set-lbl">Devices</div>';
+        h+='<div class="sect"><div class="set-hd"><span class="ic">⇄</span><span><b>Sync between devices</b><span>'+(SY.cfg?'Recipes, shifts, plans and shopping ticks match on every phone using the same code.':'Optional. Connect a free Supabase database so every phone sees the same data. Steps are in the README.')+'</span></span></div>';
         if(SY.cfg){
-          h+='<div class="note good" id="sy-status">'+esc(syLabel())+'</div><div class="small muted">Recipes, shifts, plans and shopping ticks now match on every phone connected with the same code. Edits and deletes carry across.</div><div class="row-actions" style="flex-wrap:nowrap;gap:6px"><button class="btn ghost sm" data-act="sync-now">Sync</button><button class="btn ghost sm" data-act="sync-link">Copy setup link</button><button class="btn ghost sm" data-act="sync-off">Disconnect</button></div>';
+          h+='<div class="note good" id="sy-status">'+esc(syLabel())+'</div><div class="tri"><button class="btn ghost sm" data-act="sync-now">Sync</button><button class="btn ghost sm" data-act="sync-link">Copy setup link</button><button class="btn ghost sm danger" data-act="sync-off">Disconnect</button></div>';
         }else{
-          h+='<div class="small muted">Optional. Connect a free Supabase database so every phone sees the same data. Steps are in the README.</div><div class="field"><label for="sy-url">Project URL</label><input id="sy-url" class="inp" placeholder="https://xxxx.supabase.co" autocapitalize="off" autocorrect="off"></div><div class="field"><label for="sy-key">Anon public key</label><input id="sy-key" class="inp" autocapitalize="off" autocorrect="off" placeholder="eyJ…"></div><div class="field"><label for="sy-code">Household code (make one up, keep it private)</label><input id="sy-code" class="inp" autocapitalize="off" autocorrect="off" placeholder="e.g. a long random phrase"></div><button class="btn" data-act="sync-save">Connect</button>';
+          h+='<div class="field"><label for="sy-url">Project URL</label><input id="sy-url" class="inp" placeholder="https://xxxx.supabase.co" autocapitalize="off" autocorrect="off"></div><div class="field"><label for="sy-key">Anon public key</label><input id="sy-key" class="inp" autocapitalize="off" autocorrect="off" placeholder="eyJ…"></div><div class="field"><label for="sy-code">Household code (make one up, keep it private)</label><input id="sy-code" class="inp" autocapitalize="off" autocorrect="off" placeholder="e.g. a long random phrase"></div><button class="btn" data-act="sync-save">Connect</button>';
         }
         h+='</div>';
+        h+='<div class="set-lbl">Data</div>';
+        h+='<button class="opt" data-act="backup-restore"><span class="ic">{ }</span><span><b>Import shifts</b><span>Paste the shifts JSON Claude gives you.</span></span></button>';
       }
-      if(STANDALONE)h+='<div class="sect"><h3>This device</h3><div class="small muted">Everything is saved on this device only. Copy a backup now and then. Paste it into Import shifts to restore it.</div><div class="row-actions"><button class="btn ghost sm" data-act="backup-copy">Copy backup</button><button class="btn ghost sm" data-act="backup-restore">Import shifts</button>'+(SAMPLE?'<button class="btn ghost sm" data-act="forget-key">Remove API key</button>':'')+'</div></div>';
-      h+='<div class="small muted" style="text-align:center">Version 26 Nov, 22:35</div>';
+      h+='<div class="small muted" style="text-align:center;padding-top:4px">Version 26 Nov, 22:50</div>';
       return h;
     },
     foot:function(){return '<button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="save-rules">Save</button>';}});
@@ -1546,13 +1557,8 @@ const ACT={
     toast('Key saved on this device');
   },
   'forget-key':function(){lsDel('kt-key');SAMPLE=null;SAMPLE_LIM=null;toast('API key removed');},
-  'backup-copy':function(){
-    const t=JSON.stringify({kitchenTable:1,recipes:S.recipes,shifts:S.shifts,plan:S.plan,settings:S.settings,shop:S.shop});
-    const fallback=function(){openSheet({title:'Copy backup',body:function(){return '<div class="field"><textarea id="copybox" readonly style="min-height:260px">'+esc(t)+'</textarea></div><div class="note">Select all and copy. Keep it somewhere safe, like Notes.</div>';}});};
-    try{navigator.clipboard.writeText(t).then(function(){toast('Backup copied. Paste it into Notes.');},fallback);}catch(e){fallback();}
-  },
   'backup-restore':function(){
-    openSheet({title:'Import shifts',ctx:{text:''},body:function(c){return '<div class="field"><label for="bk">Paste the shifts JSON Claude gave you (a full backup works too)</label><textarea id="bk" data-bind="text" style="min-height:220px">'+esc(c.text||'')+'</textarea></div>';},
+    openSheet({title:'Import shifts',ctx:{text:''},body:function(c){return '<div class="field"><label for="bk">Paste the shifts JSON Claude gave you</label><textarea id="bk" data-bind="text" style="min-height:220px">'+esc(c.text||'')+'</textarea></div>';},
       foot:function(){return '<button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="restore-go">Import</button>';}});
   },
   'import-json':function(el){
@@ -1586,11 +1592,7 @@ const ACT={
       applyBuiltins();persistLocal();document.querySelectorAll('.overlay').forEach(function(o){o.remove();});render(true);
       toast(added+' days added'+(kept?', '+kept+' left as you had them':'')+'. Times filled from your presets where known.');return;
     }
-    if(!d||d.kitchenTable!==1||typeof d.recipes!=='object'){toast('That isn’t a Kitchen Table backup.');return;}
-    confirmBox('Replace everything on this device with this backup?','Restore',function(){
-      S.recipes=d.recipes||{};S.shifts=d.shifts||{};S.plan=d.plan||{};S.settings=mergeSettings(d.settings);
-      S.shop=Object.assign({checked:{},extras:[],horizon:'all',shopped:{}},d.shop||{});
-      persistLocal();document.querySelectorAll('.overlay').forEach(function(o){o.remove();});render(true);toast('Backup restored');});
+    toast('That isn’t shifts or recipes JSON.');
   },
   'import-ics':function(){if(guardWrite())openIcs();},
   'ics-go':function(el){
