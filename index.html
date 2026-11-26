@@ -549,6 +549,7 @@ function builtinPreset(titleOf,iso,dowOf_){
   }
   if(/(^|[^a-z0-9])pls([^a-z0-9]|$)|premier league/.test(t)){
     if(dow===6)return {state:'work',leave:'08:30',ret:'21:00',food:false};
+    if([2,3,4].indexOf(dow)>=0)return {state:'work',leave:'16:00',ret:'23:00',food:false};
     return null;
   }
   if(tntLike&&[2,3,4].indexOf(dow)>=0)return {state:'work',leave:'13:00',ret:'23:00',food:false};
@@ -836,15 +837,13 @@ function dayCard(iso){
   h+='<div class="people">'
     +'<button class="who '+(jl.cls==='need'?'need':jl.cls==='off'?'off':'j')+'" data-act="edit-day" data-date="'+iso+'"><small>Julian</small><span>'+esc(jl.t)+'</span></button>'
     +'<button class="who '+(vl.cls==='off'?'off':'v')+'" data-act="edit-day" data-date="'+iso+'"><small>Viv</small><span>'+esc(vl.t)+'</span></button></div>';
-  const pk=inf.packedToday,pl=[];
-  if(pk.viv)pl.push('viv');if(pk.julian)pl.push('julian');
-  if(pl.length&&iso>todayISO()){
-    const yp=S.plan[addDays(iso,-1)],yc=dinnerCovers(S,addDays(iso,-1));
-    let src;
-    if(yc==='recipe')src='from '+fmtDate(addDays(iso,-1)).split(' ')[0]+'’s '+recipeName(yp.rid);
-    else if(yc==='nocook')src='not covered, last night isn’t home-cooked';
-    else src='';
-    h+='<div class="note '+(yc==='recipe'?'good':(src?'warn':''))+'">Packed meal today: <b>'+esc(namesOf(pl))+'</b>'+(src?' · '+esc(src):'')+'</div>';
+  const pl=inf.packedTomorrow;
+  if(pl.length&&iso>=todayISO()){
+    const tc=dinnerCovers(S,iso),tp=S.plan[iso];
+    let src='';
+    if(tc==='recipe')src='from tonight’s '+recipeName(tp.rid);
+    else if(tc==='nocook')src='not covered, tonight isn’t home-cooked';
+    h+='<div class="note '+(tc==='recipe'?'good':(src?'warn':''))+'">Packed lunch needed tomorrow: <b>'+esc(namesOf(pl))+'</b>'+(src?' · '+esc(src):'')+'</div>';
   }
   h+='<div class="dinner">';
   const when=hm(inf.dinnerAt);
@@ -862,7 +861,6 @@ function dayCard(iso){
     h+='<div class="small muted">Default '+inf.portions+': '+esc(parts.join(' + '))+'</div>';
   }else if(p.kind==='takeaway'||p.kind==='out'){
     h+='<div class="chosen"><span style="font-family:var(--font-display);font-weight:600;font-size:18px">'+(p.kind==='takeaway'?'Takeaway night':'Eating out')+'</span><button class="btn ghost sm" data-act="pick-dinner" data-date="'+iso+'">Change</button></div>';
-    if(inf.packedTomorrow.length)h+='<div class="note warn">Tomorrow’s packed meal for '+esc(namesOf(inf.packedTomorrow))+' won’t come from tonight. Plan something else.</div>';
   }else{
     h+='<button class="pick" data-act="pick-dinner" data-date="'+iso+'">+ Choose dinner</button>';
     const sg=takeawaySuggestion(S,iso);
