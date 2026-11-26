@@ -1255,14 +1255,14 @@ function openRules(){
       if(STANDALONE){
         h+='<div class="sect"><h3>Sync between devices</h3>';
         if(SY.cfg){
-          h+='<div class="note good" id="sy-status">'+esc(syLabel())+'</div><div class="small muted">Recipes, shifts, plans and shopping ticks now match on every phone connected with the same code. Edits and deletes carry across.</div><div class="row-actions"><button class="btn ghost sm" data-act="sync-now">Sync now</button><button class="btn ghost sm" data-act="sync-link">Copy setup link for Viv</button><button class="btn ghost sm" data-act="sync-off">Disconnect</button></div>';
+          h+='<div class="note good" id="sy-status">'+esc(syLabel())+'</div><div class="small muted">Recipes, shifts, plans and shopping ticks now match on every phone connected with the same code. Edits and deletes carry across.</div><div class="row-actions" style="flex-wrap:nowrap;gap:6px"><button class="btn ghost sm" data-act="sync-now">Sync</button><button class="btn ghost sm" data-act="sync-link">Copy setup link</button><button class="btn ghost sm" data-act="sync-off">Disconnect</button></div>';
         }else{
           h+='<div class="small muted">Optional. Connect a free Supabase database so every phone sees the same data. Steps are in the README.</div><div class="field"><label for="sy-url">Project URL</label><input id="sy-url" class="inp" placeholder="https://xxxx.supabase.co" autocapitalize="off" autocorrect="off"></div><div class="field"><label for="sy-key">Anon public key</label><input id="sy-key" class="inp" autocapitalize="off" autocorrect="off" placeholder="eyJ…"></div><div class="field"><label for="sy-code">Household code (make one up, keep it private)</label><input id="sy-code" class="inp" autocapitalize="off" autocorrect="off" placeholder="e.g. a long random phrase"></div><button class="btn" data-act="sync-save">Connect</button>';
         }
         h+='</div>';
       }
       if(STANDALONE)h+='<div class="sect"><h3>This device</h3><div class="small muted">Everything is saved on this device only. Copy a backup now and then, and paste it back to restore.</div><div class="row-actions"><button class="btn ghost sm" data-act="backup-copy">Copy backup</button><button class="btn ghost sm" data-act="backup-restore">Restore or add data</button>'+(SAMPLE?'<button class="btn ghost sm" data-act="forget-key">Remove API key</button>':'')+'</div></div>';
-      h+='<div class="small muted" style="text-align:center">Version 26 Nov, 21:00</div>';
+      h+='<div class="small muted" style="text-align:center">Version 26 Nov, 21:15</div>';
       return h;
     },
     foot:function(){return '<button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="save-rules">Save</button>';}});
@@ -1461,8 +1461,8 @@ const ACT={
   'sync-off':function(el){lsDel('kt-sync');lsDel('kt-sync-base');SY.cfg=null;SY.base={};clearTimeout(SY.timer);toast('Disconnected. Data stays on this device.');closeSheet(el);},
   'sync-link':function(){
     const u=location.origin+location.pathname+'#kt='+btoa(unescape(encodeURIComponent(JSON.stringify(SY.cfg))));
-    const fb=function(){openSheet({title:'Setup link',body:function(){return '<div class="field"><textarea readonly style="min-height:160px">'+esc(u)+'</textarea></div><div class="note">Send this to Viv. Opening it connects her phone.</div>';}});};
-    try{navigator.clipboard.writeText(u).then(function(){toast('Link copied. Send it to Viv.');},fb);}catch(e){fb();}
+    const fb=function(){openSheet({title:'Setup link',body:function(){return '<div class="field"><textarea readonly style="min-height:160px">'+esc(u)+'</textarea></div><div class="note">Send this link to the other phone. Opening it connects that phone.</div>';}});};
+    try{navigator.clipboard.writeText(u).then(function(){toast('Setup link copied.');},fb);}catch(e){fb();}
   },
   'save-key':function(el){
     const inp=$('#p-key',el.closest('.overlay')),k=inp&&inp.value.trim();
