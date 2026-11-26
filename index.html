@@ -114,6 +114,7 @@ h1,h2,h3{font-family:var(--font-display);margin:0;letter-spacing:-.01em;text-wra
 .stepper{display:inline-flex;align-items:center;gap:6px}
 .stepper button{width:40px;height:40px;border-radius:50%;border:1px solid var(--line);background:var(--card);font-size:18px;line-height:1}
 .stepper b{min-width:22px;text-align:center}
+.card.day.suggest{border:2px dashed var(--accent)}
 .note{font-size:13px;border-radius:10px;padding:8px 10px;background:var(--paper);color:var(--muted)}
 .note.warn{background:var(--warn-soft);color:var(--warn)}
 .note.good{background:var(--accent-soft);color:var(--accent)}
@@ -837,9 +838,6 @@ function viewPlan(){
     +'<button class="icon-btn" data-act="plan-nav" data-d="-1" aria-label="Earlier week"'+(S.planOff<=planMin()?' disabled style="opacity:.35"':'')+'>‹</button>'
     +'<button class="icon-btn" data-act="plan-nav" data-d="1" aria-label="Later week">›</button></span></div>';
   h+='<div class="small muted" style="margin-top:-6px">'+planned+' of '+dates.length+' dinners decided</div>';
-  const tk=[];
-  [dates[0],dates[dates.length-1]].forEach(function(x){const sg=takeawaySuggestion(S,x,todayISO());if(sg&&dates.indexOf(sg)>=0&&tk.indexOf(sg)<0)tk.push(sg);});
-  tk.forEach(function(sg){h+='<div class="small muted" style="margin-top:-6px">Takeaway night? <button style="background:none;border:0;padding:0;font:inherit;color:var(--accent);text-decoration:underline" data-act="set-dinner" data-date="'+sg+'" data-kind="takeaway">'+esc(fmtDate(sg))+'</button> looks like the busiest evening.</div>';});
   dates.forEach(function(iso){h+=dayCard(iso);});
   h+='<button class="btn soft block" data-act="tab" data-tab="shop">See the shopping list</button>';
   return h+'</div>';
@@ -847,7 +845,8 @@ function viewPlan(){
 function dayCard(iso){
   const inf=dayInfo(S,iso),p=S.plan[iso]||{},today=iso===todayISO();
   const jl=jLabel(inf),vl=vLabel(inf);
-  let h='<article class="card day'+(today?' today':'')+'">';
+  const sug=takeawaySuggestion(S,iso,todayISO())===iso&&!(p&&p.kind);
+  let h='<article class="card day'+(today?' today':'')+(sug?' suggest':'')+'">';
   h+='<div class="day-head"><b>'+esc(fmtDate(iso))+'</b>'+(today?'<span class="pill">Today</span>':'')+'</div>';
   h+='<div class="people">'
     +'<button class="who '+(jl.cls==='need'?'need':jl.cls==='off'?'off':'j')+'" data-act="edit-day" data-who="j" data-date="'+iso+'"><small>Julian</small><span>'+esc(jl.t)+'</span></button>'
@@ -877,9 +876,8 @@ function dayCard(iso){
   }else if(p.kind==='takeaway'||p.kind==='out'){
     h+='<div class="chosen"><span style="font-family:var(--font-display);font-weight:600;font-size:18px">'+(p.kind==='takeaway'?'Takeaway night':'Eating out')+'</span><button class="btn ghost sm" data-act="pick-dinner" data-date="'+iso+'">Change</button></div>';
   }else{
-    h+='<button class="pick" data-act="pick-dinner" data-date="'+iso+'">+ Choose dinner</button>';
-    const sg=takeawaySuggestion(S,iso,todayISO());
-    if(sg===iso)h+='<div class="note warn">Both home late tonight. Busiest evening this week. <button class="btn sm soft" style="margin-left:6px" data-act="set-dinner" data-date="'+iso+'" data-kind="takeaway">Make it takeaway</button></div>';
+    if(sug)h+='<div class="two"><button class="pick" data-act="pick-dinner" data-date="'+iso+'">+ Choose dinner</button><button class="pick" data-act="set-dinner" data-date="'+iso+'" data-kind="takeaway">Takeaway</button></div>';
+    else h+='<button class="pick" data-act="pick-dinner" data-date="'+iso+'">+ Choose dinner</button>';
   }
   if(inf.nxJulianLost)h+='<div class="note">Julian’s away tonight, so no leftovers for his packed meal tomorrow.</div>';
   if(inf.jLate&&p.kind==='recipe')h+='<div class="note">Julian eats later, home about '+hm(inf.jLate)+'. His portion gets reheated.</div>';
@@ -1274,7 +1272,7 @@ function openRules(){
         h+='</div>';
       }
       if(STANDALONE)h+='<div class="sect"><h3>This device</h3><div class="small muted">Everything is saved on this device only. Copy a backup now and then, and paste it back to restore.</div><div class="row-actions"><button class="btn ghost sm" data-act="backup-copy">Copy backup</button><button class="btn ghost sm" data-act="backup-restore">Restore or add data</button>'+(SAMPLE?'<button class="btn ghost sm" data-act="forget-key">Remove API key</button>':'')+'</div></div>';
-      h+='<div class="small muted" style="text-align:center">Version 26 Nov, 19:55</div>';
+      h+='<div class="small muted" style="text-align:center">Version 26 Nov, 20:15</div>';
       return h;
     },
     foot:function(){return '<button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="save-rules">Save rules</button>';}});
