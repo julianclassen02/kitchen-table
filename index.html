@@ -344,6 +344,7 @@ function vOf(S,iso){
     if(ov.type==='early')return early;
     if(ov.type==='late')return late;
     if(ov.type==='custom')return {state:'work',type:'custom',start:ov.start,end:ov.end};
+    if(ov.type==='away')return {state:'away',type:'away'};
     return {state:'off',type:ov.type};
   }
   if(!(st.vDays||[]).includes(dowOf(iso)))return {state:'off',type:'off'};
@@ -379,17 +380,20 @@ function dayInfo(S,iso){
   const vHomeAt=V.state==='work'?(mins(V.end)==null?17*60:mins(V.end))+st.commute:0;
   const pf=packedFlags(S,iso);
   let cook,cookAt;
-  if(!jAtDinner){cook='viv';cookAt=vHomeAt;}
+  const vAtDinner=V.state!=='away';
+  if(!jAtDinner&&!vAtDinner){cook='viv';cookAt=0;}
+  else if(!jAtDinner){cook='viv';cookAt=vHomeAt;}
+  else if(!vAtDinner){cook='julian';cookAt=jHomeAt;}
   else if(jHomeAt<vHomeAt){cook='julian';cookAt=jHomeAt;}
   else if(jHomeAt>vHomeAt){cook='viv';cookAt=vHomeAt;}
   else{cook='either';cookAt=vHomeAt;}
   const base=mins(st.dinnerTime)||1110;
   let dinnerAt=cookAt<=0?base:Math.max(cookAt+st.cookBuffer,base);
   dinnerAt=Math.ceil(dinnerAt/15)*15;
-  const eaters=['viv'].concat(jAtDinner?['julian']:[]);
+  const eaters=(vAtDinner?['viv']:[]).concat(jAtDinner?['julian']:[]);
   const nx=packedFlags(S,addDays(iso,1));
   const packedTomorrow=[];
-  if(nx.viv)packedTomorrow.push('viv');
+  if(nx.viv&&vAtDinner)packedTomorrow.push('viv');
   if(nx.julian&&jAtDinner)packedTomorrow.push('julian');
   const nxJulianLost=nx.julian&&!jAtDinner;
   const portions=eaters.length+packedTomorrow.length;
@@ -781,6 +785,7 @@ function jLabel(inf){
 }
 function vLabel(inf){
   const v=inf.v;
+  if(v.state==='away')return {t:'Away overnight',cls:'v'};
   if(v.state==='off')return {t:v.type==='holiday'?'Holiday':'Off',cls:'off'};
   const nm=v.type==='early'?'Early':v.type==='late'?'Late':'Shift';
   return {t:nm+' '+v.start+'–'+v.end,cls:'v'};
@@ -832,7 +837,7 @@ function dayCard(iso){
     +'<button class="who '+(vl.cls==='off'?'off':'v')+'" data-act="edit-day" data-date="'+iso+'"><small>Viv</small><span>'+esc(vl.t)+'</span></button></div>';
   const pk=inf.packedToday,pl=[];
   if(pk.viv)pl.push('viv');if(pk.julian)pl.push('julian');
-  if(pl.length){
+  if(pl.length&&iso>todayISO()){
     const yp=S.plan[addDays(iso,-1)],yc=dinnerCovers(S,addDays(iso,-1));
     let src;
     if(yc==='recipe')src='from '+fmtDate(addDays(iso,-1)).split(' ')[0]+'’s '+recipeName(yp.rid);
@@ -1165,26 +1170,28 @@ function openDay(iso){
   const sh=S.shifts[iso]||{};
   const J=Object.assign({state:'off',leave:'',ret:'',food:false,title:'',preset:''},sh.julian||{});
   const v=sh.viv||null;
-  const d={j:J.state,leave:J.leave,ret:J.ret,food:J.food,title:J.title,back:'',backRet:'',vt:v?v.type:'rota',vs:v&&v.start||'',ve:v&&v.end||'',preset:J.preset};
+  const rt=vOf({settings:S.settings,shifts:{}},iso).type;
+  const d={j:J.state,leave:J.leave,ret:J.ret,food:J.food,title:J.title,back:'',backRet:'',vt:v?v.type:rt,vprev:rt,vback:'',vs:v&&v.start||'',ve:v&&v.end||'',preset:J.preset};
   openSheet({title:fmtDate(iso),cls:'tall',ctx:{iso:iso,d:d},
     body:function(c){
       const d=c.d,P=S.settings.presets;
       const seg=function(path,opts,cur){return '<div class="seg" role="group">'+opts.map(function(o){return '<button data-act="segset" data-path="'+path+'" data-val="'+o[0]+'" aria-pressed="'+(cur===o[0])+'">'+o[1]+'</button>';}).join('')+'</div>';};
-      let h='<div class="sect"><h3 style="color:var(--j)">Julian</h3>'+seg('j',[['off','Off'],['work','Working'],['away','Away overnight']],d.j);
+      let h='<div class="sect"><h3 style="color:var(--j)">Julian</h3>'+seg('j',[['off','Off'],['work','Working']],d.j)+'<div style="margin-top:8px"><button class="chip" data-act="toggle-away" data-who="j" aria-pressed="'+(d.j==='away')+'">Away overnight</button></div>';
       if(d.j!=='off'){
         h+='<div class="two"><div class="field"><label for="d-leave">Leaves home</label><input id="d-leave" type="time" data-bind="leave" value="'+esc(d.leave)+'"></div>'
           +(d.j==='work'?'<div class="field"><label for="d-ret">Back home</label><input id="d-ret" type="time" data-bind="ret" value="'+esc(d.ret)+'"></div>':'<div class="field"><label for="d-back">Back home on</label><input id="d-back" type="date" min="'+addDays(iso,1)+'" data-bind="back" value="'+esc(d.back)+'"></div>')+'</div>';
         if(d.j==='away'&&d.back)h+='<div class="field"><label for="d-bret">Home at (on '+esc(fmtDate(d.back))+')</label><input id="d-bret" type="time" data-bind="backRet" value="'+esc(d.backRet)+'"></div><div class="note">'+Math.max(0,Math.round((parseISO(d.back)-parseISO(iso))/DAYMS))+' nights away. Days in between are filled in for you.</div>';
-        h+='<label class="sw"><input type="checkbox" data-bind="food"'+(d.food?' checked':'')+'> Food is provided, so no packed meal</label>';
+        h+='<label class="sw"><input type="checkbox" data-bind="food"'+(d.food?' checked':'')+'> Food provided on shift</label>';
         h+='<div class="field"><label for="d-title">Note</label><input id="d-title" data-bind="title" value="'+esc(d.title)+'" placeholder="PLS, TNT, OB…"></div>';
       }
-      h+='</div><div class="sect"><h3 style="color:var(--v)">Viv</h3>'+seg('vt',[['rota','Rota'],['early','Early'],['late','Late'],['off','Off'],['holiday','Holiday'],['custom','Custom']],d.vt);
+      h+='</div><div class="sect"><h3 style="color:var(--v)">Viv</h3>'+seg('vt',[['early','Early'],['late','Late'],['off','Off'],['holiday','Holiday'],['custom','Custom']],d.vt)+'<div style="margin-top:8px"><button class="chip" data-act="toggle-away" data-who="v" aria-pressed="'+(d.vt==='away')+'">Away overnight</button></div>';
+      if(d.vt==='away')h+='<div class="field"><label for="d-vback">Back home on (optional)</label><input id="d-vback" type="date" min="'+addDays(iso,1)+'" data-bind="vback" value="'+esc(d.vback)+'"></div>';
       if(d.vt==='custom')h+='<div class="two"><div class="field"><label for="d-vs">Starts</label><input id="d-vs" type="time" data-bind="vs" value="'+esc(d.vs)+'"></div><div class="field"><label for="d-ve">Finishes</label><input id="d-ve" type="time" data-bind="ve" value="'+esc(d.ve)+'"></div></div>';
-      if(d.vt==='rota')h+='<div class="small muted">Following the early and late rota from Rules.</div>';
       return h+'</div>';
     },
     foot:function(){return '<button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="save-day">Save</button>';}});
 }
+function rtOf(iso){return vOf({settings:S.settings,shifts:{}},iso).type;}
 function saveDay(c){
   const d=c.d,iso=c.iso,ov=c.ov;
   const old=S.shifts[iso]||{};
@@ -1192,7 +1199,7 @@ function saveDay(c){
   if(d.j==='off')julian={state:'off'};
   else julian={state:d.j,leave:d.leave||'',ret:d.j==='work'?(d.ret||''):'',food:!!d.food,title:d.title||'',preset:d.preset||'',edited:true,src:(old.julian&&old.julian.src)||''};
   let viv=null;
-  if(d.vt!=='rota'){viv={type:d.vt};if(d.vt==='custom'){viv.start=d.vs||'09:00';viv.end=d.ve||'17:00';}}
+  if(d.vt!==rtOf(iso)){viv={type:d.vt};if(d.vt==='custom'){viv.start=d.vs||'09:00';viv.end=d.ve||'17:00';}}
   if(d.j==='work'&&!d.leave&&!d.ret){toast('Add the time you leave and the time you’re back.');return;}
   if(d.j==='away'&&d.back&&!d.backRet){toast('Add the time you’re home on the last day.');return;}
   const put=function(date,jul,vv){
@@ -1206,6 +1213,12 @@ function saveDay(c){
       const ex=S.shifts[x]||{};
       const jul=(x===d.back)?{state:'work',leave:'',ret:d.backRet||'',food:true,title:d.title||'',edited:true}:{state:'away',leave:'',ret:'',food:true,title:d.title||'',edited:true};
       jobs.push(put(x,jul,ex.viv||null));
+    }
+  }
+  if(d.vt==='away'&&d.vback&&d.vback>iso){
+    for(let x=addDays(iso,1);x<d.vback&&x<=addDays(iso,30);x=addDays(x,1)){
+      const ex=S.shifts[x]||{};
+      jobs.push(put(x,ex.julian||null,{type:'away'}));
     }
   }
   closeSheet(ov);
@@ -1382,6 +1395,12 @@ const ACT={
   rtag:function(el){S.rtag=S.rtag===el.dataset.t?'':el.dataset.t;render(true);},
   'e-tag':function(el){const c=ctxOf(el),t=el.dataset.t,i=c.d.tags.indexOf(t);if(i>=0)c.d.tags.splice(i,1);else c.d.tags.push(t);el.setAttribute('aria-pressed',i<0);},
   'save-recipe':function(el){saveRecipe(ctxOf(el));},
+  'toggle-away':function(el){
+    const c=ctxOf(el),d=c.d;
+    if(el.dataset.who==='j'){d.j=d.j==='away'?'work':'away';if(d.j==='away'&&!d.food)d.food=true;}
+    else{d.vt=d.vt==='away'?(d.vprev||'early'):'away';}
+    c.render();
+  },
   segset:function(el){const c=ctxOf(el);c.d[el.dataset.path]=el.dataset.val;if(el.dataset.path==='j'&&el.dataset.val==='away'&&!c.d.food)c.d.food=true;c.render();},
   'apply-preset':function(el){
     const c=ctxOf(el),p=S.settings.presets.find(function(x){return x.id===el.dataset.id;});if(!p)return;
