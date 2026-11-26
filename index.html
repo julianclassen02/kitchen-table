@@ -930,11 +930,13 @@ function viewRecipes(){
   return h+'</div>';
 }
 
-const ICONS=[['sweet potato','🍠'],['spring onion','🌱'],['sea bass','🐟'],['sesame oil','🫙'],['olive oil','🫒'],['oil','🫙'],['onion','🧅'],['shallot','🧅'],['garlic','🧄'],['carrot','🥕'],['potato','🥔'],['tomato','🍅'],['lemon','🍋'],['lime','🍋'],['parsley','🌿'],['mint','🌿'],['thyme','🌿'],['basil','🌿'],['coriander','🌿'],['rosemary','🌿'],['asparagus','🌿'],['bay','🌿'],['aubergine','🍆'],['lettuce','🥬'],['kimchi','🥬'],['spinach','🥬'],['cucumber','🥒'],['pepper','🫑'],['chilli','🌶️'],['mushroom','🍄'],['avocado','🥑'],['apple','🍎'],['banana','🍌'],['peas','🫛'],['green beans','🫛'],['beans','🫘'],['mince','🥩'],['steak','🥩'],['beef','🥩'],['lamb','🥩'],['pork','🥩'],['sausage','🌭'],['chicken','🍗'],['bacon','🥓'],['guanciale','🥓'],['salmon','🐟'],['fish','🐟'],['anchov','🐟'],['prawn','🦐'],['egg','🥚'],['milk','🥛'],['yoghurt','🥛'],['yogurt','🥛'],['cream','🥛'],['butter','🧈'],['cheese','🧀'],['cheddar','🧀'],['parmesan','🧀'],['pecorino','🧀'],['feta','🧀'],['mozzarella','🧀'],['pitta','🫓'],['bun','🍔'],['bread','🍞'],['crumb','🍞'],['spaghetti','🍝'],['pasta','🍝'],['orzo','🍝'],['noodle','🍜'],['rice','🍚'],['flour','🌾'],['wine','🍷'],['olive','🫒'],['caper','🫒'],['stock','🥣'],['soy','🫙'],['gochujang','🌶️'],['sauce','🫙'],['ketchup','🍅'],['mayonnaise','🫙'],['mustard','🫙'],['pickle','🥒'],['paprika','🧂'],['cinnamon','🧂'],['oregano','🧂'],['salt','🧂'],['sugar','🧂']];
+const ICONS=[['toilet roll','🧻'],['toilet paper','🧻'],['loo roll','🧻'],['kitchen roll','🧻'],['kitchen towel','🧻'],['tissue','🧻'],['bin bag','🗑️'],['bin liner','🗑️'],['rubbish','🗑️'],['soap','🧼'],['hand wash','🧼'],['washing up','🧽'],['dish','🧽'],['sponge','🧽'],['cloth','🧽'],['bleach','🧴'],['cleaner','🧴'],['spray','🧴'],['detergent','🧺'],['laundry','🧺'],['washing powder','🧺'],['washing liquid','🧺'],['fabric','🧺'],['dishwasher','🫧'],['shampoo','🧴'],['conditioner','🧴'],['shower','🧴'],['body wash','🧴'],['deodorant','🧴'],['lotion','🧴'],['sun cream','🧴'],['toothpaste','🪥'],['toothbrush','🪥'],['mouthwash','🪥'],['floss','🪥'],['razor','🪒'],['plaster','🩹'],['painkiller','💊'],['paracetamol','💊'],['ibuprofen','💊'],['vitamin','💊'],['tablet','💊'],['battery','🔋'],['batteries','🔋'],['light bulb','💡'],['bulb','💡'],['candle','🕯️'],['matches','🔥'],['foil','🥫'],['cling film','🥫'],['baking paper','📄'],['parchment','📄'],['flower','💐'],['nappy','🍼'],['nappies','🍼'],['wipes','🧻'],['dog food','🐶'],['cat food','🐱'],['pet','🐾'],['coffee','☕'],['tea','🫖'],['beer','🍺'],['lager','🍺'],['cider','🍺'],['gin','🍸'],['vodka','🍸'],['prosecco','🥂'],['champagne','🥂'],['juice','🧃'],['squash','🧃'],['cola','🥤'],['lemonade','🥤'],['fizzy','🥤'],['water','💧'],['crisps','🍟'],['chocolate','🍫'],['biscuit','🍪'],['cookie','🍪'],['cake','🍰'],['cereal','🥣'],['porridge','🥣'],['oats','🥣'],['snack','🍿'],['popcorn','🍿'],['ice cream','🍦'],['honey','🍯'],['jam','🫙'],['peanut','🥜'],['nuts','🥜'],['coconut','🥥'],['black pepper','🧂'],['sweet potato','🍠'],['spring onion','🌱'],['sea bass','🐟'],['sesame oil','🫙'],['olive oil','🫒'],['oil','🫙'],['onion','🧅'],['shallot','🧅'],['garlic','🧄'],['carrot','🥕'],['potato','🥔'],['tomato','🍅'],['lemon','🍋'],['lime','🍋'],['parsley','🌿'],['mint','🌿'],['thyme','🌿'],['basil','🌿'],['coriander','🌿'],['rosemary','🌿'],['asparagus','🌿'],['bay','🌿'],['aubergine','🍆'],['lettuce','🥬'],['kimchi','🥬'],['spinach','🥬'],['cucumber','🥒'],['pepper','🫑'],['chilli','🌶️'],['mushroom','🍄'],['avocado','🥑'],['apple','🍎'],['banana','🍌'],['peas','🫛'],['green beans','🫛'],['beans','🫘'],['mince','🥩'],['steak','🥩'],['beef','🥩'],['lamb','🥩'],['pork','🥩'],['sausage','🌭'],['chicken','🍗'],['bacon','🥓'],['guanciale','🥓'],['salmon','🐟'],['fish','🐟'],['anchov','🐟'],['prawn','🦐'],['egg','🥚'],['milk','🥛'],['yoghurt','🥛'],['yogurt','🥛'],['cream','🥛'],['butter','🧈'],['cheese','🧀'],['cheddar','🧀'],['parmesan','🧀'],['pecorino','🧀'],['feta','🧀'],['mozzarella','🧀'],['pitta','🫓'],['bun','🍔'],['bread','🍞'],['crumb','🍞'],['spaghetti','🍝'],['pasta','🍝'],['orzo','🍝'],['noodle','🍜'],['rice','🍚'],['flour','🌾'],['wine','🍷'],['olive','🫒'],['caper','🫒'],['stock','🥣'],['soy','🫙'],['gochujang','🌶️'],['sauce','🫙'],['ketchup','🍅'],['mayonnaise','🫙'],['mustard','🫙'],['pickle','🥒'],['paprika','🧂'],['cinnamon','🧂'],['oregano','🧂'],['salt','🧂'],['sugar','🧂']];
 const AISLE_ICON={'Fruit & veg':'🥬','Meat & fish':'🥩','Dairy & eggs':'🥛','Bakery':'🍞','Tins & dry goods':'🥫','Frozen':'🧊','Sauces & spices':'🫙','Drinks':'🥤','Household':'🧻','Other':'🛒'};
+const ICON_C={};
+function ICON_RX(k){return ICON_C[k]||(ICON_C[k]=new RegExp('\\b'+k.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')));}
 function iconFor(name,aisle){
   const n=String(name||'').toLowerCase();
-  for(const k of ICONS){if(n.indexOf(k[0])>=0)return k[1];}
+  for(const k of ICONS){if(ICON_RX(k[0]).test(n))return k[1];}
   return AISLE_ICON[aisle]||'🛒';
 }
 function shopItemHtml(it,done,aisle){
@@ -963,8 +965,9 @@ function viewShop(){
     h+='<div class="mgroup"><h3>'+esc(a.aisle)+'</h3>'+items.map(function(i){return shopItemHtml(i,!!ck[i.key],a.aisle);}).join('')+'</div>';
   });
   if(data.staples.length){
-    h+='<details class="card"><summary>Check for pantry staples ('+data.staples.length+')</summary><div style="margin-top:10px">'
-     +data.staples.map(function(i){return '<div class="item" style="cursor:default"><span class="nm"><b>'+esc(i.name)+'</b></span><span class="qty">'+esc(fmtQ(i.q,i.u))+'</span></div>';}).join('')+'</div></details>';
+    const st=data.staples.slice().sort(function(x,y){return (ck[x.key]?1:0)-(ck[y.key]?1:0);}),sl=st.filter(function(i){return !ck[i.key];}).length;
+    h+='<details class="mgroup"><summary style="cursor:pointer;font-family:var(--font-display);font-weight:600;font-size:21px;list-style:none;padding:4px 0">Check for pantry staples ('+sl+') <span class="muted" style="font-size:16px">▾</span></summary><div style="margin-top:6px">'
+     +st.map(function(i){return shopItemHtml(i,!!ck[i.key],i.aisle);}).join('')+'</div></details>';
   }
   if(total||ex.length)h+='<div class="row-actions"><button class="btn soft sm" data-act="shop-finish">Finish shop</button></div>';
   if(sd)h+='<div class="small muted">Already shopped for '+sd+' dinner'+(sd>1?'s':'')+'. <button class="btn ghost sm" data-act="shop-reset" style="margin-left:4px">Show them again</button></div>';
@@ -1285,7 +1288,7 @@ function openRules(){
         h+='</div>';
       }
       if(STANDALONE)h+='<div class="sect"><h3>This device</h3><div class="small muted">Everything is saved on this device only. Copy a backup now and then, and paste it back to restore.</div><div class="row-actions"><button class="btn ghost sm" data-act="backup-copy">Copy backup</button><button class="btn ghost sm" data-act="backup-restore">Restore or add data</button>'+(SAMPLE?'<button class="btn ghost sm" data-act="forget-key">Remove API key</button>':'')+'</div></div>';
-      h+='<div class="small muted" style="text-align:center">Version 26 Nov, 22:00</div>';
+      h+='<div class="small muted" style="text-align:center">Version 26 Nov, 22:20</div>';
       return h;
     },
     foot:function(){return '<button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="save-rules">Save</button>';}});
