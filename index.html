@@ -408,14 +408,17 @@ function dayInfo(S,iso){
   const busy=(vHomeAt>=20*60&&jAtDinner&&jHomeAt>=21*60)?(vHomeAt+jHomeAt):0;
   return {iso:iso,j:j,v:v,jHomeAt:jHomeAt,vHomeAt:vHomeAt,cook:cook,dinnerAt:dinnerAt,eaters:eaters,packedToday:pf,packedTomorrow:packedTomorrow,nxJulianLost:nxJulianLost,portions:portions,jLate:jLate,busy:busy};
 }
-function takeawaySuggestion(S,iso){
+function takeawaySuggestion(S,iso,from){
   if(!S.settings.takeaway)return null;
   const mon=mondayISO(iso);let best=null,score=0;
   for(let i=0;i<7;i++){
     const d=addDays(mon,i),p=S.plan[d];
     if(p&&p.kind==='takeaway')return null;
+    if(from&&d<from)continue;
     const inf=dayInfo(S,d);
-    if(inf.busy>score){score=inf.busy;best=d;}
+    let sc=inf.busy;
+    if(!sc&&inf.j.state==='work'&&inf.v.state==='work'){if(Math.min(inf.jHomeAt,inf.vHomeAt)>=1110)sc=inf.jHomeAt+inf.vHomeAt;}
+    if(sc>score){score=sc;best=d;}
   }
   if(!best)return null;
   const p=S.plan[best];
@@ -832,6 +835,9 @@ function viewPlan(){
     +'<button class="icon-btn" data-act="plan-nav" data-d="-1" aria-label="Earlier week"'+(S.planOff<=0?' disabled style="opacity:.35"':'')+'>‹</button>'
     +'<button class="icon-btn" data-act="plan-nav" data-d="1" aria-label="Later week">›</button></span></div>';
   h+='<div class="small muted" style="margin-top:-6px">'+planned+' of 7 dinners decided</div>';
+  const tk=[];
+  [dates[0],dates[6]].forEach(function(x){const sg=takeawaySuggestion(S,x,todayISO());if(sg&&dates.indexOf(sg)>=0&&tk.indexOf(sg)<0)tk.push(sg);});
+  tk.forEach(function(sg){h+='<div class="small muted" style="margin-top:-6px">Takeaway night? <button style="background:none;border:0;padding:0;font:inherit;color:var(--accent);text-decoration:underline" data-act="set-dinner" data-date="'+sg+'" data-kind="takeaway">'+esc(fmtDate(sg))+'</button> looks like the busiest evening.</div>';});
   dates.forEach(function(iso){h+=dayCard(iso);});
   h+='<button class="btn soft block" data-act="tab" data-tab="shop">See the shopping list</button>';
   return h+'</div>';
@@ -870,7 +876,7 @@ function dayCard(iso){
     h+='<div class="chosen"><span style="font-family:var(--font-display);font-weight:600;font-size:18px">'+(p.kind==='takeaway'?'Takeaway night':'Eating out')+'</span><button class="btn ghost sm" data-act="pick-dinner" data-date="'+iso+'">Change</button></div>';
   }else{
     h+='<button class="pick" data-act="pick-dinner" data-date="'+iso+'">+ Choose dinner</button>';
-    const sg=takeawaySuggestion(S,iso);
+    const sg=takeawaySuggestion(S,iso,todayISO());
     if(sg===iso)h+='<div class="note warn">Both home late tonight. Busiest evening this week. <button class="btn sm soft" style="margin-left:6px" data-act="set-dinner" data-date="'+iso+'" data-kind="takeaway">Make it takeaway</button></div>';
   }
   if(inf.nxJulianLost)h+='<div class="note">Julian’s away tonight, so no leftovers for his packed meal tomorrow.</div>';
@@ -1266,7 +1272,7 @@ function openRules(){
         h+='</div>';
       }
       if(STANDALONE)h+='<div class="sect"><h3>This device</h3><div class="small muted">Everything is saved on this device only. Copy a backup now and then, and paste it back to restore.</div><div class="row-actions"><button class="btn ghost sm" data-act="backup-copy">Copy backup</button><button class="btn ghost sm" data-act="backup-restore">Restore or add data</button>'+(SAMPLE?'<button class="btn ghost sm" data-act="forget-key">Remove API key</button>':'')+'</div></div>';
-      h+='<div class="small muted" style="text-align:center">Version 26 Nov, 19:20</div>';
+      h+='<div class="small muted" style="text-align:center">Version 26 Nov, 19:40</div>';
       return h;
     },
     foot:function(){return '<button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="save-rules">Save rules</button>';}});
