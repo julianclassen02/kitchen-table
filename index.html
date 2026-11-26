@@ -347,6 +347,8 @@ function vOf(S,iso){
     if(ov.type==='away')return {state:'away',type:'away'};
     return {state:'off',type:ov.type};
   }
+  const jh=sh&&sh.julian;
+  if(jh&&jh.state==='off'&&/holiday/i.test(jh.title||''))return {state:'off',type:'holiday'};
   if(!(st.vDays||[]).includes(dowOf(iso)))return {state:'off',type:'off'};
   const wk=Math.round((mondayMs(iso)-mondayMs(st.vAnchor))/(7*DAYMS));
   const even=((wk%2)+2)%2===0;
@@ -1174,7 +1176,7 @@ function openDay(iso){
   const sh=S.shifts[iso]||{};
   const J=Object.assign({state:'off',leave:'',ret:'',food:false,title:'',preset:''},sh.julian||{});
   const v=sh.viv||null;
-  const rt=vOf({settings:S.settings,shifts:{}},iso).type;
+  const rt=vOf({settings:S.settings,shifts:iso in S.shifts?{[iso]:{julian:(S.shifts[iso]||{}).julian}}:{}},iso).type;
   const d={j:J.state,leave:J.leave,ret:J.ret,food:J.food,title:J.title,back:'',backRet:'',vt:v?v.type:rt,vprev:rt,vback:'',vs:v&&v.start||'',ve:v&&v.end||'',preset:J.preset};
   openSheet({title:fmtDate(iso),cls:'tall',ctx:{iso:iso,d:d},
     body:function(c){
@@ -1195,7 +1197,7 @@ function openDay(iso){
     },
     foot:function(){return '<button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="save-day">Save</button>';}});
 }
-function rtOf(iso){return vOf({settings:S.settings,shifts:{}},iso).type;}
+function rtOf(iso,jul){const sh={};if(jul)sh[iso]={julian:jul};return vOf({settings:S.settings,shifts:sh},iso).type;}
 function saveDay(c){
   const d=c.d,iso=c.iso,ov=c.ov;
   const old=S.shifts[iso]||{};
@@ -1203,7 +1205,7 @@ function saveDay(c){
   if(d.j==='off')julian={state:'off'};
   else julian={state:d.j,leave:d.leave||'',ret:d.j==='work'?(d.ret||''):'',food:!!d.food,title:d.title||'',preset:d.preset||'',edited:true,src:(old.julian&&old.julian.src)||''};
   let viv=null;
-  if(d.vt!==rtOf(iso)){viv={type:d.vt};if(d.vt==='custom'){viv.start=d.vs||'09:00';viv.end=d.ve||'17:00';}}
+  if(d.vt!==rtOf(iso,julian)){viv={type:d.vt};if(d.vt==='custom'){viv.start=d.vs||'09:00';viv.end=d.ve||'17:00';}}
   if(d.j==='work'&&!d.leave&&!d.ret){toast('Add the time you leave and the time you’re back.');return;}
   if(d.j==='away'&&d.back&&!d.backRet){toast('Add the time you’re home on the last day.');return;}
   const put=function(date,jul,vv){
