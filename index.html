@@ -957,14 +957,21 @@ function viewRecipes(){
   return h+'</div>';
 }
 
-const ICONS=[['toilet roll','🧻'],['toilet paper','🧻'],['loo roll','🧻'],['kitchen roll','🧻'],['kitchen towel','🧻'],['tissue','🧻'],['bin bag','🗑️'],['bin liner','🗑️'],['rubbish','🗑️'],['soap','🧼'],['hand wash','🧼'],['washing up','🧽'],['dish','🧽'],['sponge','🧽'],['cloth','🧽'],['bleach','🧴'],['cleaner','🧴'],['spray','🧴'],['detergent','🧺'],['laundry','🧺'],['washing powder','🧺'],['washing liquid','🧺'],['fabric','🧺'],['dishwasher','🫧'],['shampoo','🧴'],['conditioner','🧴'],['shower','🧴'],['body wash','🧴'],['deodorant','🧴'],['lotion','🧴'],['sun cream','🧴'],['toothpaste','🪥'],['toothbrush','🪥'],['mouthwash','🪥'],['floss','🪥'],['razor','🪒'],['plaster','🩹'],['painkiller','💊'],['paracetamol','💊'],['ibuprofen','💊'],['vitamin','💊'],['tablet','💊'],['battery','🔋'],['batteries','🔋'],['light bulb','💡'],['bulb','💡'],['candle','🕯️'],['matches','🔥'],['foil','🥫'],['cling film','🥫'],['baking paper','📄'],['parchment','📄'],['flower','💐'],['nappy','🍼'],['nappies','🍼'],['wipes','🧻'],['dog food','🐶'],['cat food','🐱'],['pet','🐾'],['coffee','☕'],['tea','🫖'],['beer','🍺'],['lager','🍺'],['cider','🍺'],['gin','🍸'],['vodka','🍸'],['prosecco','🥂'],['champagne','🥂'],['juice','🧃'],['squash','🧃'],['cola','🥤'],['lemonade','🥤'],['fizzy','🥤'],['water','💧'],['crisps','🍟'],['chocolate','🍫'],['biscuit','🍪'],['cookie','🍪'],['cake','🍰'],['cereal','🥣'],['porridge','🥣'],['oats','🥣'],['snack','🍿'],['popcorn','🍿'],['ice cream','🍦'],['honey','🍯'],['jam','🫙'],['peanut','🥜'],['nuts','🥜'],['coconut','🥥'],['black pepper','🧂'],['sweet potato','🍠'],['spring onion','🌱'],['sea bass','🐟'],['sesame oil','🫙'],['olive oil','🫒'],['oil','🫙'],['onion','🧅'],['shallot','🧅'],['garlic','🧄'],['carrot','🥕'],['potato','🥔'],['tomato','🍅'],['lemon','🍋'],['lime','🍋'],['parsley','🌿'],['mint','🌿'],['thyme','🌿'],['basil','🌿'],['coriander','🌿'],['rosemary','🌿'],['asparagus','🌿'],['bay','🌿'],['aubergine','🍆'],['lettuce','🥬'],['kimchi','🥬'],['spinach','🥬'],['cucumber','🥒'],['pepper','🫑'],['chilli','🌶️'],['mushroom','🍄'],['avocado','🥑'],['apple','🍎'],['banana','🍌'],['peas','🫛'],['green beans','🫛'],['beans','🫘'],['mince','🥩'],['steak','🥩'],['beef','🥩'],['lamb','🥩'],['pork','🥩'],['sausage','🌭'],['chicken','🍗'],['bacon','🥓'],['guanciale','🥓'],['salmon','🐟'],['fish','🐟'],['anchov','🐟'],['prawn','🦐'],['egg','🥚'],['milk','🥛'],['yoghurt','🥛'],['yogurt','🥛'],['cream','🥛'],['butter','🧈'],['cheese','🧀'],['cheddar','🧀'],['parmesan','🧀'],['pecorino','🧀'],['feta','🧀'],['mozzarella','🧀'],['pitta','🫓'],['bun','🍔'],['bread','🍞'],['crumb','🍞'],['spaghetti','🍝'],['pasta','🍝'],['orzo','🍝'],['noodle','🍜'],['rice','🍚'],['flour','🌾'],['wine','🍷'],['olive','🫒'],['caper','🫒'],['stock','🥣'],['soy','🫙'],['gochujang','🌶️'],['sauce','🫙'],['ketchup','🍅'],['mayonnaise','🫙'],['mustard','🫙'],['pickle','🥒'],['paprika','🧂'],['cinnamon','🧂'],['oregano','🧂'],['salt','🧂'],['sugar','🧂']];
-const AISLE_ICON={'Fruit & veg':'🥬','Meat & fish':'🥩','Dairy & eggs':'🥛','Bakery':'🍞','Tins & dry goods':'🥫','Frozen':'🧊','Sauces & spices':'🫙','Drinks':'🥤','Household':'🧻','Other':'🛒'};
+// Only exact matches get a picture; '' entries block a looser match below (no icon is better than a misleading one).
+const ICONS=[
+['stock',''],['stock cube',''],['bouillon',''],['paste',''],['puree',''],['sauce',''],['oil',''],['vinegar',''],['peanut butter',''],['coconut milk',''],['coconut oil',''],['oat milk',''],['almond milk',''],['soy milk',''],['lemon juice',''],['garlic bread',''],['egg noodle',''],['breadcrumb',''],['black pepper',''],['ice cream','🍦'],['rice noodle','🍜'],
+['toilet roll','🧻'],['toilet paper','🧻'],['loo roll','🧻'],['kitchen roll','🧻'],['kitchen towel','🧻'],['soap','🧼'],['hand wash','🧼'],['sponge','🧽'],['shampoo','🧴'],['conditioner','🧴'],['lotion','🧴'],['sun cream','🧴'],['toothbrush','🪥'],['razor','🪒'],['plaster','🩹'],['painkiller','💊'],['paracetamol','💊'],['ibuprofen','💊'],['vitamin','💊'],['battery','🔋'],['batteries','🔋'],['light bulb','💡'],['candle','🕯️'],['flower','💐'],
+['coffee','☕'],['tea','🫖'],['beer','🍺'],['lager','🍺'],['prosecco','🥂'],['champagne','🥂'],['juice','🧃'],['cola','🥤'],['chocolate','🍫'],['biscuit','🍪'],['cookie','🍪'],['cake','🍰'],['popcorn','🍿'],['honey','🍯'],['peanut','🥜'],['nuts','🥜'],['coconut','🥥'],
+['sweet potato','🍠'],['onion','🧅'],['garlic','🧄'],['carrot','🥕'],['potato','🥔'],['tomato','🍅'],['lemon','🍋'],['parsley','🌿'],['mint','🌿'],['thyme','🌿'],['basil','🌿'],['coriander','🌿'],['rosemary','🌿'],['aubergine','🍆'],['lettuce','🥬'],['spinach','🥬'],['cucumber','🥒'],['pepper','🫑'],['chilli','🌶️'],['mushroom','🍄'],['avocado','🥑'],['apple','🍎'],['banana','🍌'],['peas','🫛'],['green beans','🫛'],['beans','🫘'],
+['steak','🥩'],['beef','🥩'],['lamb','🥩'],['pork','🥩'],['chicken','🍗'],['bacon','🥓'],['fish','🐟'],['prawn','🦐'],['egg','🥚'],['milk','🥛'],['butter','🧈'],['cheese','🧀'],['cheddar','🧀'],
+['pitta','🫓'],['bread','🍞'],['spaghetti','🍝'],['pasta','🍝'],['noodle','🍜'],['rice','🍚'],['wine','🍷'],['olive','🫒'],['salt','🧂']
+];
 const ICON_C={};
 function ICON_RX(k){return ICON_C[k]||(ICON_C[k]=new RegExp('\\b'+k.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')));}
-function iconFor(name,aisle){
+function iconFor(name){
   const n=String(name||'').toLowerCase();
   for(const k of ICONS){if(ICON_RX(k[0]).test(n))return k[1];}
-  return AISLE_ICON[aisle]||'🛒';
+  return '';
 }
 function shopItemHtml(it,done,aisle){
   const q=fmtQ(it.q,it.u),sub=it.from&&it.from.length?'<small>'+esc(it.from.join(', '))+'</small>':'';
@@ -1326,7 +1333,7 @@ function openRules(){
         h+='</div>';
       }
       if(STANDALONE)h+='<div class="sect"><h3>This device</h3><div class="small muted">Everything is saved on this device only. Copy a backup now and then, and paste it back to restore.</div><div class="row-actions"><button class="btn ghost sm" data-act="backup-copy">Copy backup</button><button class="btn ghost sm" data-act="backup-restore">Restore or add data</button>'+(SAMPLE?'<button class="btn ghost sm" data-act="forget-key">Remove API key</button>':'')+'</div></div>';
-      h+='<div class="small muted" style="text-align:center">Version 26 Nov, 23:30</div>';
+      h+='<div class="small muted" style="text-align:center">Version 26 Nov, 21:25</div>';
       return h;
     },
     foot:function(){return '<button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="save-rules">Save</button>';}});
