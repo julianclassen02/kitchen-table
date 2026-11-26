@@ -516,6 +516,35 @@ function presetCandidates(title,dow,presets){
 function julianFromPreset(p,title){
   return {state:p.away?'away':'work',leave:p.leave||'',ret:p.ret||'',food:!!p.food,title:title||'',preset:p.id};
 }
+// Built-in shift presets (kept in code on purpose, no editor)
+function builtinPreset(titleOf,iso,dowOf_){
+  const t=String(titleOf(iso)||'').toLowerCase();
+  if(!t)return null;
+  const dow=dowOf_(iso);
+  const prev=String(titleOf(addDays(iso,-1))||'').toLowerCase();
+  const next=String(titleOf(addDays(iso,1))||'').toLowerCase();
+  const tntLike=/(^|[^a-z0-9])(tnt|ucl|uel|uecl|europa|champions|conference)([^a-z0-9]|$)/.test(t);
+  if(/amazon/.test(t)){
+    const first=!/amazon/.test(prev),last=!/amazon/.test(next);
+    if(last&&!first){
+      if(tntLike&&[2,3,4].indexOf(dow)>=0)return {state:'work',leave:'13:00',ret:'23:00',food:true};
+      return {state:'work',leave:'',ret:'18:00',food:true};
+    }
+    if(first&&last)return {state:'work',leave:'',ret:'',food:true};
+    return {state:'away',leave:'',ret:'',food:true};
+  }
+  if(/ufc/.test(t)){
+    if(/ufc/.test(prev))return {state:'work',leave:'07:00',ret:'18:00',food:false};
+    return {state:'work',leave:'14:00',ret:'17:00',food:false};
+  }
+  if(/(^|[^a-z0-9])pls([^a-z0-9]|$)|premier league/.test(t)){
+    if(dow===6)return {state:'work',leave:'08:30',ret:'21:00',food:false};
+    return null;
+  }
+  if(tntLike&&[2,3,4].indexOf(dow)>=0)return {state:'work',leave:'13:00',ret:'23:00',food:false};
+  if(/fa cup|(^|[^a-z0-9])ob([^a-z0-9]|$)/.test(t))return {state:'work',leave:'',ret:'',food:true};
+  return null;
+}
 // ===== LOGIC END =====
 
 // ---------- state ----------
@@ -525,6 +554,19 @@ let DB=null,SAMPLE=null,SAMPLE_LIM=null,pendingRender=false,STANDALONE=false;
 function lsGet(k){try{return localStorage.getItem(k);}catch(e){return null;}}
 function lsSet(k,v){try{localStorage.setItem(k,v);return true;}catch(e){return false;}}
 function lsDel(k){try{localStorage.removeItem(k);}catch(e){}}
+function applyBuiltins(){
+  const titleOf=function(d){const sh=S.shifts[d];return sh&&sh.julian?sh.julian.title:'';};
+  let n=0;
+  Object.keys(S.shifts).forEach(function(d){
+    const sh=S.shifts[d],J=sh&&sh.julian;
+    if(!J||J.edited||J.state==='off'||J.leave||J.ret)return;
+    const r=builtinPreset(titleOf,d,dowOf);
+    if(!r)return;
+    sh.julian=Object.assign({},J,r);n++;
+  });
+  if(n)persistLocal();
+  return n;
+}
 function persistLocal(){
   if(!lsSet('kt-data',JSON.stringify({recipes:S.recipes,shifts:S.shifts,plan:S.plan,settings:S.settings,shop:S.shop}))&&!S.noStore){S.noStore=true;}
 }
@@ -1270,14 +1312,14 @@ const ACT={
       Object.keys(d.shifts).forEach(function(date){
         if(!/^\d{4}-\d{2}-\d{2}$/.test(date))return;
         const ex=S.shifts[date],v=d.shifts[date];
-        if(ex&&ex.julian&&(ex.julian.edited||ex.julian.state!=='off')){kept++;return;}
+        if(ex&&ex.julian&&(ex.julian.edited||(ex.julian.state!=='off'&&(ex.julian.leave||ex.julian.ret)))){kept++;return;}
         const off=String(v).charAt(0)==='!',title=off?String(v).slice(1):String(v);
         const doc={date:date,julian:off?{state:'off',title:title,edited:true}:{state:'work',leave:'',ret:'',food:false,title:title}};
         if(ex&&ex.viv)doc.viv=ex.viv;
         S.shifts[date]=Object.assign({id:date},doc);added++;
       });
-      persistLocal();document.querySelectorAll('.overlay').forEach(function(o){o.remove();});render(true);
-      toast(added+' days added'+(kept?', '+kept+' left as you had them':'')+'. Tap a day to add times.');return;
+      applyBuiltins();persistLocal();document.querySelectorAll('.overlay').forEach(function(o){o.remove();});render(true);
+      toast(added+' days added'+(kept?', '+kept+' left as you had them':'')+'. Times filled from your presets where known.');return;
     }
     if(!d||d.kitchenTable!==1||typeof d.recipes!=='object'){toast('That isn’t a Kitchen Table backup.');return;}
     confirmBox('Replace everything on this device with this backup?','Restore',function(){
@@ -1376,7 +1418,7 @@ async function init(){
   }catch(e){}
   if(DB){subscribe();}
   else{
-    STANDALONE=true;loadLocal();
+    STANDALONE=true;loadLocal();applyBuiltins();
     const k=lsGet('kt-key');
     if(k){SAMPLE=makeApiSample(k);try{SAMPLE_LIM=await SAMPLE.limits();}catch(e){}}
     if(lsGet('kt-probe')===null&&!lsSet('kt-probe','1'))S.noStore=true;
