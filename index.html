@@ -804,7 +804,9 @@ function vLabel(inf){
 }
 function namesOf(a){return a.map(function(x){return PN[x];}).join(' & ');}
 function recipeName(id){const r=S.recipes[id];return r?r.name:'Deleted recipe';}
-function planDates(){const t=todayISO(),a=[];for(let i=0;i<7;i++)a.push(addDays(t,S.planOff*7+i));return a;}
+function planBase(){const t=todayISO();return dowOf(t)===1?t:addDays(mondayISO(t),7);}
+function planMin(){return dowOf(todayISO())===1?0:-1;}
+function planDates(){const t=todayISO(),b=addDays(planBase(),S.planOff*7),a=[];for(let i=0;i<7;i++){const d=addDays(b,i);if(d>=t)a.push(d);}return a;}
 function horizonDates(){
   const t=todayISO(),h=S.shop.horizon;
   if(h==='all'){return Object.keys(S.plan).filter(function(d){return d>=t;}).sort();}
@@ -829,14 +831,14 @@ function saveShop(patch){
 function viewPlan(){
   const dates=planDates();
   const planned=dates.filter(function(d){const p=S.plan[d];return p&&p.kind;}).length;
-  const label=S.planOff===0?'Next 7 days':fmtShort(dates[0])+' – '+fmtShort(dates[6]);
+  const wk=addDays(planBase(),S.planOff*7),label=fmtShort(wk)+' – '+fmtShort(addDays(wk,6));
   let h='<div class="stack">';
   h+='<div class="range"><b>'+esc(label)+'</b><span class="row-actions">'
-    +'<button class="icon-btn" data-act="plan-nav" data-d="-1" aria-label="Earlier week"'+(S.planOff<=0?' disabled style="opacity:.35"':'')+'>‹</button>'
+    +'<button class="icon-btn" data-act="plan-nav" data-d="-1" aria-label="Earlier week"'+(S.planOff<=planMin()?' disabled style="opacity:.35"':'')+'>‹</button>'
     +'<button class="icon-btn" data-act="plan-nav" data-d="1" aria-label="Later week">›</button></span></div>';
-  h+='<div class="small muted" style="margin-top:-6px">'+planned+' of 7 dinners decided</div>';
+  h+='<div class="small muted" style="margin-top:-6px">'+planned+' of '+dates.length+' dinners decided</div>';
   const tk=[];
-  [dates[0],dates[6]].forEach(function(x){const sg=takeawaySuggestion(S,x,todayISO());if(sg&&dates.indexOf(sg)>=0&&tk.indexOf(sg)<0)tk.push(sg);});
+  [dates[0],dates[dates.length-1]].forEach(function(x){const sg=takeawaySuggestion(S,x,todayISO());if(sg&&dates.indexOf(sg)>=0&&tk.indexOf(sg)<0)tk.push(sg);});
   tk.forEach(function(sg){h+='<div class="small muted" style="margin-top:-6px">Takeaway night? <button style="background:none;border:0;padding:0;font:inherit;color:var(--accent);text-decoration:underline" data-act="set-dinner" data-date="'+sg+'" data-kind="takeaway">'+esc(fmtDate(sg))+'</button> looks like the busiest evening.</div>';});
   dates.forEach(function(iso){h+=dayCard(iso);});
   h+='<button class="btn soft block" data-act="tab" data-tab="shop">See the shopping list</button>';
@@ -1272,7 +1274,7 @@ function openRules(){
         h+='</div>';
       }
       if(STANDALONE)h+='<div class="sect"><h3>This device</h3><div class="small muted">Everything is saved on this device only. Copy a backup now and then, and paste it back to restore.</div><div class="row-actions"><button class="btn ghost sm" data-act="backup-copy">Copy backup</button><button class="btn ghost sm" data-act="backup-restore">Restore or add data</button>'+(SAMPLE?'<button class="btn ghost sm" data-act="forget-key">Remove API key</button>':'')+'</div></div>';
-      h+='<div class="small muted" style="text-align:center">Version 26 Nov, 19:40</div>';
+      h+='<div class="small muted" style="text-align:center">Version 26 Nov, 19:55</div>';
       return h;
     },
     foot:function(){return '<button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="save-rules">Save rules</button>';}});
@@ -1360,7 +1362,7 @@ const ACT={
   tab:function(el){S.tab=el.dataset.tab;try{history.replaceState(null,'','#'+S.tab);}catch(e){}render(true);view.scrollTop=0;},
   close:function(el){closeSheet(el);},
   'confirm-ok':function(el){const c=ctxOf(el);closeSheet(el);if(c&&c.ok)c.ok();},
-  'plan-nav':function(el){S.planOff=Math.max(0,S.planOff+Number(el.dataset.d));render(true);view.scrollTop=0;},
+  'plan-nav':function(el){S.planOff=Math.max(planMin(),S.planOff+Number(el.dataset.d));render(true);view.scrollTop=0;},
   'shift-nav':function(el){S.shiftOff=Math.max(0,S.shiftOff+Number(el.dataset.d));render(true);view.scrollTop=0;},
   'edit-day':function(el){if(guardWrite())openDay(el.dataset.date,el.dataset.who);},
   'pick-dinner':function(el){if(guardWrite())openPicker(el.dataset.date);},
