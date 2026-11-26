@@ -950,7 +950,6 @@ function dayCard(iso){
     else h+='<button class="pick" data-act="pick-dinner" data-date="'+iso+'">+ Choose dinner</button>';
   }
   if(inf.nxJulianLost)h+='<div class="note">Julian’s away tonight, so no leftovers for his packed meal tomorrow.</div>';
-  if(inf.jLate&&p.kind==='recipe')h+='<div class="note">Julian eats later, home about '+hm(inf.jLate)+'. His portion gets reheated.</div>';
   h+='</div></article>';
   return h;
 }
@@ -1367,7 +1366,7 @@ function openRules(){
         h+='<div class="set-lbl">Data</div>';
         h+='<button class="opt" data-act="backup-restore"><span class="ic">{ }</span><span><b>Import shifts</b><span>Paste the shifts JSON Claude gives you.</span></span></button>';
       }
-      h+='<div class="small muted" style="text-align:center;padding-top:4px">Version 26 Nov, 23:20</div>';
+      h+='<div class="small muted" style="text-align:center;padding-top:4px">Version 26 Nov, 23:30</div>';
       return h;
     },
     foot:function(){return '<button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="save-rules">Save</button>';}});
