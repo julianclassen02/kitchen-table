@@ -939,7 +939,6 @@ function dayCard(iso){
     h+='<div class="chosen"><button class="name" data-act="open-recipe" data-id="'+esc(p.rid)+'">'+esc(r?r.name:'Deleted recipe')+'</button>'
       +'<button class="btn ghost sm" data-act="pick-dinner" data-date="'+iso+'">Change</button></div>';
     h+='<div class="chosen"><span class="small muted">'+portions+' portions</span><span class="stepper"><button data-act="portions" data-date="'+iso+'" data-d="-1" aria-label="Fewer portions">−</button><b>'+portions+'</b><button data-act="portions" data-date="'+iso+'" data-d="1" aria-label="More portions">+</button></span></div>';
-    const parts=[];const eat=inf.eaters.length;
   }else if(p.kind==='takeaway'||p.kind==='out'){
     h+='<div class="chosen"><span style="font-family:var(--font-display);font-weight:600;font-size:18px">'+(p.kind==='takeaway'?'Takeaway night':'Eating out')+'</span><button class="btn ghost sm" data-act="pick-dinner" data-date="'+iso+'">Change</button></div>';
   }else{
