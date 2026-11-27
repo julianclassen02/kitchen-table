@@ -541,13 +541,25 @@ function buildShopping(S,dates){
    }
   }
   const out={},staples=[];
+  // what's already at home (fridge + pantry) comes off the list; shared pool so two lines can't use the same stock twice
+  const pool=((S.fridge&&S.fridge.items)||[]).filter(function(f){return f.q!=null&&f.q>0;}).map(function(f){return {name:f.name,u:uk(f.u),q:f.q};});
   map.forEach(function(it){
+    if(it.q!=null&&!isStaple(it.name,S.settings.staples)){
+      for(const lvl of [2,1]){
+        for(const f of pool){
+          if(!(it.q>1e-9))break;
+          if(f.q>0&&f.u===uk(it.u)&&nameMatch(f.name,it.name)===lvl){const t=Math.min(f.q,it.q);f.q-=t;it.q-=t;it.have=(it.have||0)+t;}
+        }
+      }
+    }
+    if(it.q!=null&&it.have&&(it.u==='g'||it.u==='ml')&&it.q<10)it.q=0;
     if(it.q!=null){
       if(it.u==='g'||it.u==='ml')it.q=it.q>=50?Math.round(it.q/5)*5:Math.round(it.q);
       else if(!it.u||PLURAL_U[it.u])it.q=Math.ceil(it.q-1e-9);
       else it.q=Math.ceil(it.q*2-1e-9)/2;
     }
     if(isStaple(it.name,S.settings.staples)){staples.push(it);return;}
+    if(it.q!=null&&it.have&&!(it.q>0))return;
     const a=AISLES.indexOf(it.aisle)>=0?it.aisle:'Other';
     (out[a]=out[a]||[]).push(it);
   });
@@ -1678,7 +1690,7 @@ function openRules(){
         h+='<div class="set-lbl">Data</div>';
         h+='<button class="opt" data-act="backup-restore"><span class="ic">{ }</span><span><b>Import shifts</b><span>Paste the shifts JSON Claude gives you.</span></span></button>';
       }
-      h+='<div class="small muted" style="text-align:center;padding-top:4px">Version 27 Nov, 16:41</div>';
+      h+='<div class="small muted" style="text-align:center;padding-top:4px">Version 27 Nov, 16:58</div>';
       return h;
     },
     foot:function(){return '<button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="save-rules">Save</button>';}});
