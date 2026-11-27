@@ -478,6 +478,8 @@ function dayInfo(S,iso){
   const packedTomorrow=[];
   if(nx.viv&&vAtDinner)packedTomorrow.push('viv');
   if(nx.julian&&jAtDinner)packedTomorrow.push('julian');
+  const nl=S.plan[addDays(iso,1)];
+  if(nl&&nl.lunch&&nl.lunch.kind==='recipe'&&nl.lunch.rid)packedTomorrow.length=0; // tomorrow's lunch has its own recipe
   const nxJulianLost=nx.julian&&!jAtDinner;
   const portions=eaters.length+packedTomorrow.length;
   const jLate=jAtDinner&&j.state==='work'?(jHomeAt>dinnerAt+60?jHomeAt:0):0;
@@ -508,6 +510,7 @@ function dinnerCovers(S,iso){
 }
 
 function isStaple(name,staples){
+  if(/\b(peppers|(red|green|yellow|orange|bell|sweet|roasted|jalapeno|chilli) pepper|water chestnuts?)\b/i.test(String(name||'')))return false;
   const k=ingKey(name);
   return String(staples||'').split(',').map(function(x){return ingKey(x);}).filter(Boolean).some(function(s){
     return k===s||new RegExp('\\b'+s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b').test(k);});
@@ -551,28 +554,15 @@ function buildShopping(S,dates){
   const out={},staples=[];
   // what's already at home (fridge + pantry) comes off the list; shared pool so two lines can't use the same stock twice
   const pool=((S.fridge&&S.fridge.items)||[]).filter(function(f){return f.q!=null&&f.q>0;}).map(function(f){return {name:f.name,u:uk(f.u),q:f.q};});
-  const homeAll=((S.fridge&&S.fridge.items)||[]).filter(function(f){return f.q==null||f.q>0;});
+  // an item with no amount (everyday items) only counts as at home for 5 days after it was bought
+  const tdy=todayISO(),homeAll=((S.fridge&&S.fridge.items)||[]).filter(function(f){return f.q!=null?f.q>0:!!(f.added&&f.added>=addDays(tdy,-5));});
   const eq=(S.settings&&S.settings.unitEq)||{},sure=(S.shop&&S.shop.sure)||{},unsure=[];
   map.forEach(function(it){
     const stp=isStaple(it.name,S.settings.staples);
     // no amount on one side (everyday items): having the item at all counts as covered
     if(!stp&&homeAll.some(function(f){return (it.q==null||f.q==null)&&nameMatch(f.name,it.name)>0;})){it.have=1;it.covered=true;return;}
     if(it.q!=null&&!stp){
-      const orig=it.q,ru=uk(it.u);let rem=it.q,maybe=null;
-      for(const lvl of [2,1]){
-        for(const f of pool){
-          if(!(rem>1e-9))break;
-          if(!(f.q>0)||nameMatch(f.name,it.name)!==lvl)continue;
-          const pu=eq[ingKey(f.name)+'|'+f.u+'|'+ru];
-          if(f.u===ru){const t=Math.min(f.q,rem);f.q-=t;rem-=t;}
-          else if(pu>0){const t=Math.min(f.q*pu,rem);f.q-=t/pu;rem-=t;}
-          else{
-            const g1=unitG(f.name,f.u),g2=unitG(it.name,it.u);
-            if(g1&&g2){const t=Math.min(f.q*g1,rem*g2);f.q-=t/g1;rem-=t/g2;}
-            else if(!maybe)maybe=f;
-          }
-        }
-      }
+      const orig=it.q,dd=drawDown(pool,it.name,it.u,it.q,eq),rem=dd.rem,maybe=dd.maybe;
       if(rem>1e-9&&maybe&&sure[it.key]!=='no'){
         unsure.push({key:it.key,name:it.name,need:Math.round(rem*100)/100,u:it.u,haveQ:maybe.q,haveU:maybe.u,haveName:maybe.name});
         return;
@@ -825,7 +815,7 @@ function fridgeFromShopping(S,dates,today){
   const data=buildShopping(S,dates),ck=(S.shop&&S.shop.checked)||{};
   let all=[];data.aisles.forEach(function(a){a.items.forEach(function(i){all.push(i);});});
   const ticked=all.filter(function(i){return ck[i.key];});
-  const bought=ticked.length?ticked:all;
+  const bought=ticked; // only what was actually ticked off counts as bought
   return bought.map(function(i){
     const home=(S.fridge&&S.fridge.items||[]).filter(function(f){return nameMatch(f.name,i.name)===2;})[0];
     return fridgeRec(i.name,i.q,i.u,i.aisle,today,undefined,home?locOf(home):undefined);
@@ -839,28 +829,51 @@ function boughtLabel(iso,today){
   const n=Math.round((parseISO(today)-parseISO(iso))/DAYMS);
   return n<=0?'Bought today':n===1?'Bought yesterday':'Bought '+n+' days ago';
 }
+const GENERIC=/^(cheese|pasta|chicken|beef|pork|lamb|fish|meat|milk|butter|cream|stock|sauce|oil|juice)$/;
+const PREPARED=/\b(soup|meal|ravioli|tortellini|lasagne|pie|pizza|sandwich)\b|&/i;
 function nameMatch(a,b){
   const x=keyWords(a),y=keyWords(b);if(!x.length||!y.length)return 0;
   if(x.join(' ')===y.join(' '))return 2;
-  const s=x.length<=y.length?x:y,l=x.length<=y.length?y:x;
-  return s.every(function(w){return l.indexOf(w)>=0;})?1:0;
+  const sx=x.length<=y.length,s=sx?x:y,l=sx?y:x,rs=String(sx?a:b),rl=String(sx?b:a);
+  if(!s.every(function(w){return l.indexOf(w)>=0;}))return 0;
+  // a loose "contains" match must not turn "pasta" into a ready meal, or "milk" into "coconut milk"
+  if(s.length===1&&GENERIC.test(s[0]))return 0;
+  if(PREPARED.test(rl)&&!PREPARED.test(rs))return 0;
+  return 1;
 }
-function fridgeConsume(items,ings,f){
-  const out=items.map(function(i){return Object.assign({},i);});
+// Take `need` (in unit u) of ingredient `name` out of the stock list, converting units where we can.
+// Used by BOTH the shopping list and cooking, so they always agree. Returns what's still needed and any
+// stocked item we couldn't convert.
+function drawDown(list,name,u,need,eq,touched){
+  const ru=uk(u);let rem=need,maybe=null;
+  for(const lvl of [2,1]){
+    for(const f of list){
+      if(!(rem>1e-9))break;
+      if(!(f.q>0)||nameMatch(f.name,name)!==lvl)continue;
+      const fu=uk(f.u),pu=eq&&eq[ingKey(f.name)+'|'+fu+'|'+ru];
+      if(fu===ru){const t=Math.min(f.q,rem);f.q-=t;rem-=t;}
+      else if(pu>0){const t=Math.min(f.q*pu,rem);f.q-=t/pu;rem-=t;}
+      else{
+        const g1=unitG(f.name,f.u),g2=unitG(name,u);
+        if(g1&&g2){const t=Math.min(f.q*g1,rem*g2);f.q-=t/g1;rem-=t/g2;}
+        else{if(!maybe)maybe=f;continue;}
+      }
+      if(touched)touched.add(f);
+    }
+  }
+  return {rem:rem,maybe:maybe};
+}
+function fridgeConsume(items,ings,f,eq){
+  const out=items.map(function(i){return Object.assign({},i);}),touched=new Set();
+  const order=out.slice().sort(function(a,b){return String(a.use||'9999').localeCompare(String(b.use||'9999'));});
   let hits=0;
   (ings||[]).forEach(function(ing){
     if(ing.q==null)return;
-    let need=ing.q*f;if(!(need>0))return;
-    for(const lvl of [2,1]){
-      const cand=out.filter(function(i){return i.q!=null&&i.q>0&&uk(i.u)===uk(ing.u)&&nameMatch(i.name,ing.n)===lvl;}).sort(function(a,b){return String(a.use||'9999').localeCompare(String(b.use||'9999'));});
-      for(const it of cand){
-        if(need<=1e-9)break;
-        const take=Math.min(it.q,need);it.q=it.q-take;need-=take;hits++;
-        if(it.u==='g'||it.u==='ml')it.q=Math.round(it.q);else it.q=Math.round(it.q*100)/100;
-      }
-      if(need<=1e-9)break;
-    }
+    const need=ing.q*f;if(!(need>0))return;
+    const before=touched.size,r=drawDown(order,ing.n,ing.u,need,eq,touched);
+    if(touched.size>before||r.rem<need-1e-9)hits++;
   });
+  touched.forEach(function(i){if(i.u==='g'||i.u==='ml')i.q=Math.round(i.q);else i.q=Math.round(i.q*100)/100;});
   return {items:out.filter(function(i){return i.q==null||i.q>1e-9;}),hits:hits};
 }
 function pendingMeals(S,today){
@@ -1417,7 +1430,7 @@ function recordMeal(m,ok,portions,rating){
   S.plan[m.date]=Object.assign({id:m.date},doc);
   const r=S.recipes[m.rid];
   if(ok&&r){
-    const f=portions*mealWeight(S,m.date,m.slot)/(r.servings||2),res=fridgeConsume(S.fridge.items||[],r.ingredients,f);
+    const f=portions*mealWeight(S,m.date,m.slot)/(r.servings||2),res=fridgeConsume(S.fridge.items||[],r.ingredients,f,S.settings.unitEq);
     S.fridge=Object.assign({},S.fridge,{items:res.items,from:S.fridge.from||todayISO()});
     const rd=JSON.parse(JSON.stringify(r));rd.lastCooked=m.date;
     if(rating){rd.rSum=(rd.rSum||0)+rating;rd.rN=(rd.rN||0)+1;}
@@ -1771,7 +1784,7 @@ function openRules(){
         h+='<div class="set-lbl">Data</div>';
         h+='<button class="opt" data-act="backup-restore"><span class="ic">{ }</span><span><b>Import shifts</b><span>Paste the shifts JSON Claude gives you.</span></span></button>';
       }
-      h+='<div class="small muted" style="text-align:center;padding-top:4px">Version 27 Nov, 18:44</div>';
+      h+='<div class="small muted" style="text-align:center;padding-top:4px">Version 27 Nov, 19:05</div>';
       return h;
     },
     foot:function(){return '<button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="save-rules">Save</button>';}});
@@ -2127,12 +2140,20 @@ const ACT={
     const sp=Object.assign({},S.shop.shopped||{});
     const bought=fridgeFromShopping(S,shopDates(),todayISO());
     const evb=Object.assign({},S.shop.evBought||{}),cks=S.shop.checked||{},tdy=todayISO();let items=(S.fridge.items||[]).slice();
-    everydayList(S).forEach(function(n){
-      if(!cks['ev:'+n.toLowerCase()])return;
+    const doneX=(S.shop.extras||[]).filter(function(e){return e.done;});
+    if(!bought.length&&!doneX.length&&!everydayList(S).some(function(n){return cks['ev:'+n.toLowerCase()];})){toast('Tick what you bought first.');return;}
+    const buyEveryday=function(n){
       evb[n.toLowerCase()]=tdy;
       const old=items.filter(function(f){return nameMatch(f.name,n)>0;})[0];
       items=items.filter(function(f){return nameMatch(f.name,n)===0;});
       bought.push(fridgeRec(n,null,'',undefined,tdy,undefined,old?locOf(old):undefined,true));
+    };
+    everydayList(S).forEach(function(n){if(cks['ev:'+n.toLowerCase()])buyEveryday(n);});
+    // things you added yourself and ticked go into the fridge/pantry too
+    doneX.forEach(function(e){
+      if(isEveryday(S,e.name)){buyEveryday(everydayList(S).filter(function(n){return nameMatch(n,e.name)>0;})[0]);return;}
+      const p=parseIng(e.name);
+      bought.push(p?fridgeRec(p.n,p.q,p.u,p.aisle,tdy):fridgeRec(e.name,null,'',undefined,tdy));
     });
     shopDates().forEach(function(d){mealsOn(S,d).forEach(function(m){sp[m.key]=true;});});
     if(bought.length){S.fridge=Object.assign({},S.fridge,{items:addFridgeItems(items,bought,true).items,from:S.fridge.from||todayISO()});persistLocal();}
