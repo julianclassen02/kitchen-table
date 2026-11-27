@@ -35,3 +35,9 @@ select cron.schedule(
        body := '{}'::jsonb
      ) $$
 );
+
+-- 4. Let the reminder function (service role) read and write these tables
+grant usage on schema public to service_role;
+grant all on public.kt_push to service_role;
+grant all on public.kt_push_log to service_role;
+grant select on public.kt_docs to service_role;
