@@ -660,16 +660,25 @@ function useByGuess(name,aisle,from){
   if(d==null)d=SHELF[a]!=null?SHELF[a]:30;
   return d?addDays(from,d):null;
 }
-function fridgeRec(name,q,u,aisle,today,use){
+function locOf(i){
+  if(i.loc==='fridge'||i.loc==='pantry')return i.loc;
+  return LONGLIFE[i.aisle]&&i.aisle!=='Frozen'?'pantry':'fridge';
+}
+function fridgeRec(name,q,u,aisle,today,use,loc){
   const a=aisle||(u==='tin'?'Tins & dry goods':guessAisle(name));
-  return {id:uid('f'),name:name,q:q==null?null:q,u:u||'',aisle:a,added:today,use:use!==undefined?use:useByGuess(name,a,today)};
+  const r={id:uid('f'),name:name,q:q==null?null:q,u:u||'',aisle:a,added:today,use:use!==undefined?use:useByGuess(name,a,today)};
+  r.loc=loc==='fridge'||loc==='pantry'?loc:locOf(r);
+  return r;
 }
 function fridgeFromShopping(S,dates,today){
   const data=buildShopping(S,dates),ck=(S.shop&&S.shop.checked)||{};
   let all=[];data.aisles.forEach(function(a){a.items.forEach(function(i){all.push(i);});});
   const ticked=all.filter(function(i){return ck[i.key];});
   const bought=ticked.length?ticked:all;
-  return bought.map(function(i){return fridgeRec(i.name,i.q,i.u,i.aisle,today);});
+  return bought.map(function(i){
+    const home=(S.fridge&&S.fridge.items||[]).filter(function(f){return nameMatch(f.name,i.name)===2;})[0];
+    return fridgeRec(i.name,i.q,i.u,i.aisle,today,undefined,home?locOf(home):undefined);
+  });
 }
 function keyWords(n){return ingKey(n).split(' ').filter(Boolean);}
 function nameMatch(a,b){
@@ -706,12 +715,12 @@ function pendingMeals(S,today){
   });
   return out;
 }
-function fridgeGroups(items,today){
+function fridgeGroups(items,today,loc){
   const soon=addDays(today,3),g={soon:[],fresh:[],freezer:[],cupboard:[]};
-  items.slice().sort(function(a,b){return String(a.use||'9999').localeCompare(String(b.use||'9999'))||a.name.localeCompare(b.name);}).forEach(function(i){
+  items.filter(function(i){return !loc||locOf(i)===loc;}).slice().sort(function(a,b){return String(a.use||'9999').localeCompare(String(b.use||'9999'))||a.name.localeCompare(b.name);}).forEach(function(i){
     if(i.use&&i.use<=soon&&!LONGLIFE[i.aisle])g.soon.push(i);
     else if(i.aisle==='Frozen')g.freezer.push(i);
-    else if(LONGLIFE[i.aisle])g.cupboard.push(i);
+    else if(LONGLIFE[i.aisle]&&locOf(i)==='pantry')g.cupboard.push(i);
     else g.fresh.push(i);
   });
   return g;
@@ -729,7 +738,7 @@ function useLabel(use,today){
 
 // ---------- state ----------
 const S={recipes:{},shifts:{},plan:{},settings:mergeSettings(null),shop:{checked:{},extras:[],horizon:'all'},fridge:{items:[],from:null},
-  ui:{},tab:'plan',planOff:0,shiftOff:0,rq:'',rtag:'',loaded:{},canWrite:true,live:false,slow:false};
+  ui:{},ft:'fridge',tab:'plan',planOff:0,shiftOff:0,rq:'',rtag:'',loaded:{},canWrite:true,live:false,slow:false};
 let DB=null,SAMPLE=null,SAMPLE_LIM=null,pendingRender=false,STANDALONE=false;
 function lsGet(k){try{return localStorage.getItem(k);}catch(e){return null;}}
 function lsSet(k,v){try{localStorage.setItem(k,v);return true;}catch(e){return false;}}
@@ -1137,14 +1146,19 @@ function viewFridge(){
   let h='<div class="stack">';
   if(pend.length)h+='<button class="banner info mcb" data-act="mc-open"><b>'+(pend.length===1?'Did you cook last night’s meal?':'Confirm '+pend.length+' meals you planned')+'</b><span>Confirm it, rate it, and the fridge updates.</span></button>';
   if(!items.length){
-    h+='<div class="empty"><h3>Nothing in the fridge yet</h3><p class="muted" style="margin:0">Add what you have now. After that, everything you buy with Finish shop lands here, and every meal you confirm comes off.</p><button class="btn" data-act="fridge-add">Add what you’ve got</button></div>';
+    h+='<div class="empty"><h3>Nothing at home yet</h3><p class="muted" style="margin:0">Add what you have now. After that, everything you buy with Finish shop lands here, and every meal you confirm comes off.</p><button class="btn" data-act="fridge-add">Add what you’ve got</button></div>';
     return h+'</div>';
   }
-  const g=fridgeGroups(items,today);
-  [['soon','Use soon'],['fresh','Fridge & fresh'],['freezer','Freezer'],['cupboard','Cupboard']].forEach(function(x){
-    if(!g[x[0]].length)return;
+  const nf=items.filter(function(i){return locOf(i)==='fridge';}).length,np=items.length-nf;
+  h+='<div class="seg" role="group" aria-label="Where it is kept"><button data-act="fridge-tab" data-v="fridge" aria-pressed="'+(S.ft==='fridge')+'">Fridge · '+nf+'</button><button data-act="fridge-tab" data-v="pantry" aria-pressed="'+(S.ft==='pantry')+'">Pantry · '+np+'</button></div>';
+  const g=fridgeGroups(items,today,S.ft);
+  const labels=S.ft==='pantry'?[['soon','Use soon'],['fresh','Fresh & bread'],['cupboard','Cupboard']]:[['soon','Use soon'],['fresh','In the fridge'],['freezer','Freezer']];
+  let any=false;
+  labels.forEach(function(x){
+    if(!g[x[0]].length)return;any=true;
     h+='<div class="mgroup'+(x[0]==='soon'?' soon':'')+'"><h3>'+x[1]+' · '+g[x[0]].length+'</h3>'+g[x[0]].map(function(i){return fridgeRow(i,today);}).join('')+'</div>';
   });
+  if(!any)h+='<div class="empty"><h3>Nothing in the '+(S.ft==='pantry'?'pantry':'fridge')+' yet</h3><button class="btn" data-act="fridge-add">Add items</button></div>';
   return h+'</div>';
 }
 function saveFridge(items,extra){
@@ -1152,19 +1166,20 @@ function saveFridge(items,extra){
   persistLocal();render(true);
 }
 function openFridgeAdd(){
-  openSheet({title:'Add to the fridge',ctx:{text:''},
+  openSheet({title:'Add to the '+(S.ft==='pantry'?'pantry':'fridge'),ctx:{text:''},
     body:function(c){return '<div class="field"><label for="fa">One item per line, with an amount if you know it</label><textarea id="fa" data-bind="text" style="min-height:190px" placeholder="500 g chicken thighs&#10;2 onions&#10;1 pack spinach&#10;milk">'+esc(c.text||'')+'</textarea></div><div class="small muted">Use-by dates are guessed from the food type. Tap any item afterwards to change it.</div>';},
     foot:function(){return '<button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="fridge-add-go">Add</button>';}});
 }
 function openFridgeEdit(id){
   const it=(S.fridge.items||[]).filter(function(x){return x.id===id;})[0];if(!it)return;
-  openSheet({title:it.name,ctx:{id:id,d:{name:it.name,q:it.q==null?'':String(it.q),u:it.u||'',use:it.use||''}},
+  openSheet({title:it.name,ctx:{id:id,d:{name:it.name,q:it.q==null?'':String(it.q),u:it.u||'',use:it.use||'',loc:locOf(it)}},
     body:function(c){const d=c.d;
       const us=['','g','ml','tin','clove','pack','bunch','slice','stick','sprig'].map(function(u){return '<option value="'+u+'"'+(d.u===u?' selected':'')+'>'+(u||'no unit')+'</option>';}).join('');
       return '<div class="field"><label for="fe-n">Name</label><input id="fe-n" data-bind="name" value="'+esc(d.name)+'"></div>'
         +'<div class="two"><div class="field"><label for="fe-q">Amount</label><input id="fe-q" type="number" inputmode="decimal" step="any" min="0" data-bind="q" value="'+esc(d.q)+'" placeholder="how much"></div>'
         +'<div class="field"><label for="fe-u">Unit</label><select id="fe-u" data-bind="u">'+us+'</select></div></div>'
-        +'<div class="field"><label for="fe-d">Use by</label><input id="fe-d" type="date" data-bind="use" value="'+esc(d.use)+'"></div>';},
+        +'<div class="two"><div class="field"><label for="fe-d">Use by</label><input id="fe-d" type="date" data-bind="use" value="'+esc(d.use)+'"></div>'
+        +'<div class="field"><label for="fe-l">Kept in</label><select id="fe-l" data-bind="loc"><option value="fridge"'+(d.loc==='fridge'?' selected':'')+'>Fridge</option><option value="pantry"'+(d.loc==='pantry'?' selected':'')+'>Pantry</option></select></div></div>';},
     foot:function(){return '<button class="btn danger" data-act="fridge-del">Used up</button><button class="btn" data-act="fridge-save">Save</button>';}});
 }
 function mcStars(n){let h='';for(let i=1;i<=5;i++)h+='<button class="star'+(n>=i?' on':'')+'" data-act="mc-star" data-n="'+i+'" aria-label="'+i+' star'+(i>1?'s':'')+'">★</button>';return h;}
@@ -1545,7 +1560,7 @@ function openRules(){
         h+='<div class="set-lbl">Data</div>';
         h+='<button class="opt" data-act="backup-restore"><span class="ic">{ }</span><span><b>Import shifts</b><span>Paste the shifts JSON Claude gives you.</span></span></button>';
       }
-      h+='<div class="small muted" style="text-align:center;padding-top:4px">Version 27 Nov, 00:40</div>';
+      h+='<div class="small muted" style="text-align:center;padding-top:4px">Version 27 Nov, 01:10</div>';
       return h;
     },
     foot:function(){return '<button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="save-rules">Save</button>';}});
@@ -1802,7 +1817,7 @@ const ACT={
       d.fridge.forEach(function(x){
         if(!x||!x.name)return;
         const q=x.q==null||x.q===''?null:Number(x.q);
-        add.push(fridgeRec(String(x.name),isNaN(q)?null:q,x.u||'',x.aisle||null,t,x.use||undefined));
+        add.push(fridgeRec(String(x.name),isNaN(q)?null:q,x.u||'',x.aisle||null,t,(x.use===null?null:(x.use||undefined)),x.loc));
       });
       S.fridge=Object.assign({},S.fridge,{items:(S.fridge.items||[]).concat(add),from:S.fridge.from||t});
       persistLocal();document.querySelectorAll('.overlay').forEach(function(o){o.remove();});render(true);
@@ -1838,16 +1853,17 @@ const ACT={
   'fridge-add':function(){if(guardWrite())openFridgeAdd();},
   'fridge-add-go':function(el){
     const c=ctxOf(el),t=todayISO(),add=[];
-    String(c.text||'').split('\n').forEach(function(line){const p=parseIng(line);if(p)add.push(fridgeRec(p.n,p.q,p.u,p.aisle,t));});
+    String(c.text||'').split('\n').forEach(function(line){const p=parseIng(line);if(p)add.push(fridgeRec(p.n,p.q,p.u,p.aisle,t,undefined,S.ft));});
     if(!add.length){toast('Type at least one item.');return;}
     closeSheet(el);saveFridge((S.fridge.items||[]).concat(add));toast(add.length+(add.length===1?' item':' items')+' added.');
   },
+  'fridge-tab':function(el){S.ft=el.dataset.v==='pantry'?'pantry':'fridge';render(true);},
   'fridge-edit':function(el){if(guardWrite())openFridgeEdit(el.dataset.id);},
   'fridge-save':function(el){
     const c=ctxOf(el),d=c.d,name=String(d.name||'').trim();
     if(!name){toast('Give it a name.');return;}
     const q=d.q===''||d.q==null?null:Number(d.q);
-    saveFridge((S.fridge.items||[]).map(function(i){return i.id===c.id?Object.assign({},i,{name:name,q:isNaN(q)?null:q,u:d.u||'',use:d.use||null}):i;}));
+    saveFridge((S.fridge.items||[]).map(function(i){return i.id===c.id?Object.assign({},i,{name:name,q:isNaN(q)?null:q,u:d.u||'',use:d.use||null,loc:d.loc==='pantry'?'pantry':'fridge'}):i;}));
     closeSheet(el);
   },
   'fridge-del':function(el){const c=ctxOf(el);saveFridge((S.fridge.items||[]).filter(function(i){return i.id!==c.id;}));closeSheet(el);},
