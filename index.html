@@ -62,7 +62,7 @@ h1,h2,h3{font-family:var(--font-display);margin:0;letter-spacing:-.01em;text-wra
 .top .sub{color:var(--muted);font-size:13px;margin-top:2px}
 #view{flex:1;min-height:0;overflow-y:auto;padding:6px 16px 28px;-webkit-overflow-scrolling:touch}
 .stack{display:flex;flex-direction:column;gap:12px}
-.tabs{display:grid;grid-template-columns:repeat(4,1fr);background:var(--card);border-top:1px solid var(--line);padding:6px 6px calc(env(safe-area-inset-bottom) + 6px)}
+.tabs{display:grid;grid-template-columns:repeat(5,1fr);background:var(--card);border-top:1px solid var(--line);padding:6px 6px calc(env(safe-area-inset-bottom) + 6px)}
 .tab{background:none;border:0;display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 0;color:var(--muted);font-size:12px;font-weight:500;position:relative;border-radius:12px}
 .tab svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .tab[aria-current="page"]{color:var(--accent)}
@@ -103,6 +103,17 @@ h1,h2,h3{font-family:var(--font-display);margin:0;letter-spacing:-.01em;text-wra
 .wk-mid span{font-size:12.5px;color:var(--muted)}
 .day-head .dd8{font-size:15px;color:var(--muted);font-weight:500}
 .day-head .pill{margin-left:auto}
+
+/* fridge + morning check */
+.mi.fi .qty{flex:none;font-weight:600;font-size:15px;color:var(--ink);background:var(--paper);border-radius:99px;padding:4px 11px}
+.mi.fi.warn small{color:var(--warn);font-weight:600}
+.mgroup.soon h3{color:var(--warn)}
+button.mcb{width:100%;text-align:left;border:0;display:flex;flex-direction:column;gap:2px;font-family:inherit}
+button.mcb span{font-size:13px;opacity:.85}
+.mc-t{font-size:24px;margin:2px 0 4px}
+.stars{display:flex;gap:6px}
+.star{border:0;background:none;font-size:38px;line-height:1;color:var(--line);padding:2px 4px}
+.star.on{color:#f0b429}
 /* plan */
 .range{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:4px 0 2px}
 .range b{font-family:var(--font-display);font-size:17px}
@@ -265,6 +276,7 @@ details.card summary{cursor:pointer;font-weight:600}
     <button class="tab" data-act="tab" data-tab="plan"><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Plan</button>
     <button class="tab" data-act="tab" data-tab="recipes"><svg viewBox="0 0 24 24"><path d="M5 4.5h10a3 3 0 0 1 3 3V20H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h10"/></svg>Recipes</button>
     <button class="tab" data-act="tab" data-tab="shop"><svg viewBox="0 0 24 24"><path d="M4 9h16l-1.5 9.5a2 2 0 0 1-2 1.5h-9a2 2 0 0 1-2-1.5z"/><path d="M8.5 9l3.5-5 3.5 5"/></svg>Shop<span class="badge" id="shopbadge" hidden></span></button>
+    <button class="tab" data-act="tab" data-tab="fridge"><svg viewBox="0 0 24 24"><rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M6 10.5h12M9.5 6v2M9.5 13v3"/></svg>Fridge</button>
     <button class="tab" data-act="tab" data-tab="shifts"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>Shifts</button>
   </nav>
 </div>
@@ -628,10 +640,95 @@ function builtinPreset(titleOf,iso,dowOf_){
   if(/fa cup|(^|[^a-z0-9])ob([^a-z0-9]|$)/.test(t))return {state:'work',leave:'',ret:'',food:true};
   return null;
 }
+// ---- fridge ----
+const SHELF={'Fruit & veg':7,'Meat & fish':3,'Dairy & eggs':7,'Bakery':4,'Frozen':90,'Tins & dry goods':365,'Sauces & spices':180,'Drinks':90,'Household':0,'Other':30};
+const LONGLIFE={'Frozen':1,'Tins & dry goods':1,'Sauces & spices':1,'Drinks':1,'Household':1};
+const USEBY=[
+ [/\b(salmon|cod|haddock|sea ?bass|bass|prawn|fish|trout|mackerel|scallop|squid)/,2],
+ [/\b(mince|chicken|turkey|beef|steak|pork|lamb|duck|fillet|meatball)/,3],
+ [/\b(sausage|chorizo)/,5],[/\bbacon|\bham\b/,7],[/\bmilk\b/,5],[/yoghurt|yogurt|cream\b|creme/,7],[/\begg/,21],[/\bbutter\b/,28],
+ [/cheese|cheddar|parmesan|mozzarella|feta|halloumi/,14],
+ [/parsley|coriander|basil|mint|dill|chive|thyme|rosemary|herb/,5],
+ [/lettuce|spinach|salad|rocket|watercress|kale|pak choi/,4],[/mushroom/,5],[/avocado|banana|berry|berries|strawberr|raspberr/,4],
+ [/tomato/,6],[/asparagus|green bean|\bpeas?\b|sweetcorn/,4],[/cucumber|pepper|courgette|aubergine|broccoli|cauliflower|celery|leek/,8],
+ [/carrot|cabbage|beetroot|parsnip|swede|turnip/,14],[/potato|onion|squash|pumpkin|apple|lemon|lime|orange/,21],[/garlic|ginger/,30],[/kimchi/,60]
+];
+function useByGuess(name,aisle,from){
+  const a=aisle||guessAisle(name),n=String(name||'').toLowerCase();
+  let d=null;
+  if(!LONGLIFE[a]){for(const k of USEBY){if(k[0].test(n)){d=k[1];break;}}}
+  if(d==null)d=SHELF[a]!=null?SHELF[a]:30;
+  return d?addDays(from,d):null;
+}
+function fridgeRec(name,q,u,aisle,today,use){
+  const a=aisle||(u==='tin'?'Tins & dry goods':guessAisle(name));
+  return {id:uid('f'),name:name,q:q==null?null:q,u:u||'',aisle:a,added:today,use:use!==undefined?use:useByGuess(name,a,today)};
+}
+function fridgeFromShopping(S,dates,today){
+  const data=buildShopping(S,dates),ck=(S.shop&&S.shop.checked)||{};
+  let all=[];data.aisles.forEach(function(a){a.items.forEach(function(i){all.push(i);});});
+  const ticked=all.filter(function(i){return ck[i.key];});
+  const bought=ticked.length?ticked:all;
+  return bought.map(function(i){return fridgeRec(i.name,i.q,i.u,i.aisle,today);});
+}
+function keyWords(n){return ingKey(n).split(' ').filter(Boolean);}
+function nameMatch(a,b){
+  const x=keyWords(a),y=keyWords(b);if(!x.length||!y.length)return 0;
+  if(x.join(' ')===y.join(' '))return 2;
+  const s=x.length<=y.length?x:y,l=x.length<=y.length?y:x;
+  return s.every(function(w){return l.indexOf(w)>=0;})?1:0;
+}
+function fridgeConsume(items,ings,f){
+  const out=items.map(function(i){return Object.assign({},i);});
+  let hits=0;
+  (ings||[]).forEach(function(ing){
+    if(ing.q==null)return;
+    let need=ing.q*f;if(!(need>0))return;
+    for(const lvl of [2,1]){
+      const cand=out.filter(function(i){return i.q!=null&&i.q>0&&(i.u||'')===(ing.u||'')&&nameMatch(i.name,ing.n)===lvl;}).sort(function(a,b){return String(a.use||'9999').localeCompare(String(b.use||'9999'));});
+      for(const it of cand){
+        if(need<=1e-9)break;
+        const take=Math.min(it.q,need);it.q=it.q-take;need-=take;hits++;
+        if(it.u==='g'||it.u==='ml')it.q=Math.round(it.q);else it.q=Math.round(it.q*100)/100;
+      }
+      if(need<=1e-9)break;
+    }
+  });
+  return {items:out.filter(function(i){return i.q==null||i.q>1e-9;}),hits:hits};
+}
+function pendingMeals(S,today){
+  const from=(S.fridge&&S.fridge.from)||today,lo=addDays(today,-14),out=[];
+  Object.keys(S.plan).sort().forEach(function(d){
+    if(d<from||d>=today||d<lo)return;
+    const p=S.plan[d];if(!p)return;
+    if(p.kind==='recipe'&&p.rid&&!p.cooked&&S.recipes[p.rid])out.push({date:d,slot:'dinner',rid:p.rid,portions:mealsOn(S,d).filter(function(m){return m.key===d+':'+p.rid;}).map(function(m){return m.portions;})[0]||2});
+    if(p.lunch&&p.lunch.kind==='recipe'&&p.lunch.rid&&!p.lunch.cooked&&S.recipes[p.lunch.rid])out.push({date:d,slot:'lunch',rid:p.lunch.rid,portions:(p.lunch.portions!=null&&p.lunch.portions!=='')?p.lunch.portions:2});
+  });
+  return out;
+}
+function fridgeGroups(items,today){
+  const soon=addDays(today,3),g={soon:[],fresh:[],freezer:[],cupboard:[]};
+  items.slice().sort(function(a,b){return String(a.use||'9999').localeCompare(String(b.use||'9999'))||a.name.localeCompare(b.name);}).forEach(function(i){
+    if(i.use&&i.use<=soon&&!LONGLIFE[i.aisle])g.soon.push(i);
+    else if(i.aisle==='Frozen')g.freezer.push(i);
+    else if(LONGLIFE[i.aisle])g.cupboard.push(i);
+    else g.fresh.push(i);
+  });
+  return g;
+}
+function useLabel(use,today){
+  if(!use)return '';
+  const n=Math.round((parseISO(use)-parseISO(today))/DAYMS);
+  if(n<0)return 'Went off '+(-n===1?'yesterday':(-n)+' days ago');
+  if(n===0)return 'Use today';
+  if(n===1)return 'Use by tomorrow';
+  if(n<=6)return 'Use within '+n+' days';
+  return 'Use by '+fmtShort(use);
+}
 // ===== LOGIC END =====
 
 // ---------- state ----------
-const S={recipes:{},shifts:{},plan:{},settings:mergeSettings(null),shop:{checked:{},extras:[],horizon:'all'},
+const S={recipes:{},shifts:{},plan:{},settings:mergeSettings(null),shop:{checked:{},extras:[],horizon:'all'},fridge:{items:[],from:null},
   ui:{},tab:'plan',planOff:0,shiftOff:0,rq:'',rtag:'',loaded:{},canWrite:true,live:false,slow:false};
 let DB=null,SAMPLE=null,SAMPLE_LIM=null,pendingRender=false,STANDALONE=false;
 function lsGet(k){try{return localStorage.getItem(k);}catch(e){return null;}}
@@ -650,11 +747,12 @@ function syItems(){
   Object.keys(S.recipes).forEach(function(k){o['r:'+k]=S.recipes[k];});
   Object.keys(S.shifts).forEach(function(k){o['s:'+k]=S.shifts[k];});
   Object.keys(S.plan).forEach(function(k){o['p:'+k]=S.plan[k];});
-  o['settings']=S.settings;o['shop']=S.shop;
+  o['settings']=S.settings;o['shop']=S.shop;o['fridge']=S.fridge;
   return o;
 }
 function syApply(k,v){
   if(k==='settings')S.settings=mergeSettings(v);
+  else if(k==='fridge')S.fridge=Object.assign({items:[],from:null},v||{});
   else if(k==='shop')S.shop=Object.assign({checked:{},extras:[],horizon:'all',shopped:{}},v||{});
   else{const m={r:S.recipes,s:S.shifts,p:S.plan}[k.charAt(0)];if(m)m[k.slice(2)]=v;}
 }
@@ -751,13 +849,14 @@ function applyBuiltins(){
 }
 function persistLocal(){
   syKick();
-  if(!lsSet('kt-data',JSON.stringify({recipes:S.recipes,shifts:S.shifts,plan:S.plan,settings:S.settings,shop:S.shop}))&&!S.noStore){S.noStore=true;}
+  if(!lsSet('kt-data',JSON.stringify({recipes:S.recipes,shifts:S.shifts,plan:S.plan,settings:S.settings,shop:S.shop,fridge:S.fridge}))&&!S.noStore){S.noStore=true;}
 }
 function loadLocal(){
   const raw=lsGet('kt-data');if(!raw)return;
   try{const d=JSON.parse(raw);
     S.recipes=d.recipes||{};S.shifts=d.shifts||{};S.plan=d.plan||{};S.settings=mergeSettings(d.settings);
     S.shop=Object.assign({checked:{},extras:[],horizon:'all',shopped:{}},d.shop||{});
+    S.fridge=Object.assign({items:[],from:null},d.fridge||{});
   }catch(e){}
 }
 function parseLoose(t){
@@ -963,7 +1062,7 @@ function recipeList(){
     return '<div class="empty"><h3>Your recipe book is empty</h3><p class="muted" style="margin:0">Add the dinners you actually cook. Import JSON from Claude, or add one manually.</p><button class="btn" data-act="add-recipe">Add your first recipe</button></div>';
   }
   return list.map(function(r){
-    const bits=[(r.servings||2)+' portions'];if(r.time)bits.push(r.time+' min');
+    const bits=[(r.servings||2)+' portions'];if(r.time)bits.push(r.time+' min');if(r.rN)bits.push('★ '+(Math.round(r.rSum/r.rN*10)/10)+' ('+r.rN+')');
     return '<button class="row" data-act="open-recipe" data-id="'+esc(r.id)+'"><span class="t">'+esc(r.name)+'</span><span class="m">'+esc(bits.join(' · '))+(r.lastCooked?' · cooked '+esc(fmtShort(r.lastCooked)):'')+'</span>'
       +((r.tags||[]).length?'<span class="m">'+r.tags.map(function(t){return '<span class="pill plain">'+esc(t)+'</span>';}).join('')+'</span>':'')+'</button>';
   }).join('');
@@ -1028,6 +1127,88 @@ function viewShop(){
   if(sd)h+='<div class="small muted">Already shopped for '+sd+' dinner'+(sd>1?'s':'')+'. <button class="btn ghost sm" data-act="shop-reset" style="margin-left:4px">Show them again</button></div>';
   return h+'</div>';
 }
+function fridgeRow(i,today){
+  const q=i.q!=null?fmtQ(i.q,i.u):'',lbl=useLabel(i.use,today);
+  const warn=i.use&&i.use<=addDays(today,1)&&!LONGLIFE[i.aisle];
+  return '<button class="mi fi'+(warn?' warn':'')+'" data-act="fridge-edit" data-id="'+esc(i.id)+'"><span class="ico">'+iconFor(i.name,i.aisle)+'</span><span class="nm"><span class="t"><span class="cap">'+esc(i.name)+'</span></span>'+(lbl?'<small>'+esc(lbl)+'</small>':'')+'</span>'+(q?'<span class="qty">'+esc(q)+'</span>':'')+'</button>';
+}
+function viewFridge(){
+  const today=todayISO(),items=S.fridge.items||[],pend=pendingMeals(S,today);
+  let h='<div class="stack">';
+  if(pend.length)h+='<button class="banner info mcb" data-act="mc-open"><b>'+(pend.length===1?'Did you cook last night’s meal?':'Confirm '+pend.length+' meals you planned')+'</b><span>Confirm it, rate it, and the fridge updates.</span></button>';
+  if(!items.length){
+    h+='<div class="empty"><h3>Nothing in the fridge yet</h3><p class="muted" style="margin:0">Add what you have now. After that, everything you buy with Finish shop lands here, and every meal you confirm comes off.</p><button class="btn" data-act="fridge-add">Add what you’ve got</button></div>';
+    return h+'</div>';
+  }
+  const g=fridgeGroups(items,today);
+  [['soon','Use soon'],['fresh','Fridge & fresh'],['freezer','Freezer'],['cupboard','Cupboard']].forEach(function(x){
+    if(!g[x[0]].length)return;
+    h+='<div class="mgroup'+(x[0]==='soon'?' soon':'')+'"><h3>'+x[1]+' · '+g[x[0]].length+'</h3>'+g[x[0]].map(function(i){return fridgeRow(i,today);}).join('')+'</div>';
+  });
+  return h+'</div>';
+}
+function saveFridge(items,extra){
+  S.fridge=Object.assign({},S.fridge,{items:items,from:S.fridge.from||todayISO()},extra||{});
+  persistLocal();render(true);
+}
+function openFridgeAdd(){
+  openSheet({title:'Add to the fridge',ctx:{text:''},
+    body:function(c){return '<div class="field"><label for="fa">One item per line, with an amount if you know it</label><textarea id="fa" data-bind="text" style="min-height:190px" placeholder="500 g chicken thighs&#10;2 onions&#10;1 pack spinach&#10;milk">'+esc(c.text||'')+'</textarea></div><div class="small muted">Use-by dates are guessed from the food type. Tap any item afterwards to change it.</div>';},
+    foot:function(){return '<button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="fridge-add-go">Add</button>';}});
+}
+function openFridgeEdit(id){
+  const it=(S.fridge.items||[]).filter(function(x){return x.id===id;})[0];if(!it)return;
+  openSheet({title:it.name,ctx:{id:id,d:{name:it.name,q:it.q==null?'':String(it.q),u:it.u||'',use:it.use||''}},
+    body:function(c){const d=c.d;
+      const us=['','g','ml','tin','clove','pack','bunch','slice','stick','sprig'].map(function(u){return '<option value="'+u+'"'+(d.u===u?' selected':'')+'>'+(u||'no unit')+'</option>';}).join('');
+      return '<div class="field"><label for="fe-n">Name</label><input id="fe-n" data-bind="name" value="'+esc(d.name)+'"></div>'
+        +'<div class="two"><div class="field"><label for="fe-q">Amount</label><input id="fe-q" type="number" inputmode="decimal" step="any" min="0" data-bind="q" value="'+esc(d.q)+'" placeholder="how much"></div>'
+        +'<div class="field"><label for="fe-u">Unit</label><select id="fe-u" data-bind="u">'+us+'</select></div></div>'
+        +'<div class="field"><label for="fe-d">Use by</label><input id="fe-d" type="date" data-bind="use" value="'+esc(d.use)+'"></div>';},
+    foot:function(){return '<button class="btn danger" data-act="fridge-del">Used up</button><button class="btn" data-act="fridge-save">Save</button>';}});
+}
+function mcStars(n){let h='';for(let i=1;i<=5;i++)h+='<button class="star'+(n>=i?' on':'')+'" data-act="mc-star" data-n="'+i+'" aria-label="'+i+' star'+(i>1?'s':'')+'">★</button>';return h;}
+function openMorning(){
+  const list=pendingMeals(S,todayISO());if(!list.length){toast('Nothing to confirm right now.');return;}
+  openSheet({title:'Last night’s meals',cls:'',ctx:{list:list,i:0,p:list[0].portions,r:0},
+    body:function(c){
+      const m=c.list[c.i];if(!m)return '';
+      const r=S.recipes[m.rid],y=addDays(todayISO(),-1),when=m.date===y?(m.slot==='dinner'?'Yesterday’s dinner':'Yesterday’s lunch'):fmtDate(m.date)+(m.slot==='dinner'?' dinner':' lunch');
+      return '<div class="mc"><div class="small muted">'+(c.list.length>1?(c.i+1)+' of '+c.list.length+' · ':'')+esc(when)+'</div>'
+        +'<h2 class="mc-t">'+esc(r?r.name:'Recipe')+'</h2>'
+        +'<div class="label" style="margin-top:6px">Portions you cooked</div><div class="chosen"><span class="small muted">Planned '+m.portions+'</span><span class="stepper"><button data-act="mc-p" data-d="-1" aria-label="Fewer">−</button><b>'+c.p+'</b><button data-act="mc-p" data-d="1" aria-label="More">+</button></span></div>'
+        +'<div class="label" style="margin-top:10px">How was it? <span class="muted" style="font-weight:400">optional</span></div><div class="stars">'+mcStars(c.r)+'</div></div>';
+    },
+    foot:function(c){return '<button class="btn ghost" data-act="mc-no">Didn’t cook it</button><button class="btn" data-act="mc-yes">Yes, cooked it</button>';}});
+}
+function mcFinish(c){
+  c.i++;
+  if(c.i>=c.list.length){document.querySelectorAll('.overlay').forEach(function(o){o.remove();});toast('Done. The fridge is up to date.');render(true);return;}
+  c.p=c.list[c.i].portions;c.r=0;c.render();
+}
+function recordMeal(m,ok,portions,rating){
+  const p=S.plan[m.date];if(!p)return;
+  const cooked={ok:ok,at:todayISO()};
+  if(ok){cooked.portions=portions;if(rating)cooked.rating=rating;}
+  const doc=JSON.parse(JSON.stringify(p));delete doc.id;
+  if(m.slot==='dinner')doc.cooked=cooked;else if(doc.lunch)doc.lunch.cooked=cooked;
+  S.plan[m.date]=Object.assign({id:m.date},doc);
+  const r=S.recipes[m.rid];
+  if(ok&&r){
+    const f=portions/(r.servings||2),res=fridgeConsume(S.fridge.items||[],r.ingredients,f);
+    S.fridge=Object.assign({},S.fridge,{items:res.items,from:S.fridge.from||todayISO()});
+    const rd=JSON.parse(JSON.stringify(r));rd.lastCooked=m.date;
+    if(rating){rd.rSum=(rd.rSum||0)+rating;rd.rN=(rd.rN||0)+1;}
+    S.recipes[m.rid]=rd;
+  }
+  persistLocal();
+}
+function maybeMorning(){
+  if(document.querySelector('.overlay'))return;
+  const t=todayISO();if(lsGet('kt-mc')===t)return;
+  if(!pendingMeals(S,t).length)return;
+  lsSet('kt-mc',t);openMorning();
+}
 function shopCount(){
   const data=buildShopping(S,shopDates()),ck=S.shop.checked||{};
   let n=0;data.aisles.forEach(function(a){a.items.forEach(function(i){if(!ck[i.key])n++;});});
@@ -1047,12 +1228,13 @@ function viewShifts(){
   return h+'</div>';
 }
 
-const TITLES={plan:['Plan',''],recipes:['Recipes',''],shop:['Shop',''],shifts:['Shifts','']};
+const TITLES={plan:['Plan',''],recipes:['Recipes',''],shop:['Shop',''],fridge:['Fridge',''],shifts:['Shifts','']};
 const GEAR='<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>';
 const SHARE='<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="M8 7l4-4 4 4"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg>';
 function topActs(){
   let h='';
   if(S.tab==='recipes'&&Object.keys(S.recipes).length)h+='<button class="btn sm" data-act="add-recipe">+ Add</button>';
+  if(S.tab==='fridge'&&(S.fridge.items||[]).length)h+='<button class="btn sm" data-act="fridge-add">+ Add</button>';
   if(S.tab==='shop'&&shopCount()>=0&&(S.shop.extras||[]).length+buildShopping(S,shopDates()).aisles.length>0)h+='<button class="icon-btn" data-act="shop-copy" aria-label="Copy list">'+SHARE+'</button>';
   return h+'<button class="icon-btn" data-act="rules" aria-label="Settings">'+GEAR+'</button>';
 }
@@ -1065,12 +1247,13 @@ function render(force){
   if(!S.canWrite)h+='<div class="banner" style="margin-bottom:12px">You can look but not edit. Ask Julian to give you Contributor access.</div>';
   if(S.slow)h+='<div class="banner" style="margin-bottom:12px">Still reaching your saved data. What you see may be out of date.</div>';
   if(!DB&&S.noStore)h+='<div class="banner" style="margin-bottom:12px">This browser won’t let the app save. Turn off private browsing, or add it to your home screen.</div>';
-  if(S.tab==='plan')h+=viewPlan();else if(S.tab==='recipes')h+=viewRecipes();else if(S.tab==='shop')h+=viewShop();else h+=viewShifts();
+  if(S.tab==='plan')h+=viewPlan();else if(S.tab==='recipes')h+=viewRecipes();else if(S.tab==='shop')h+=viewShop();else if(S.tab==='fridge')h+=viewFridge();else h+=viewShifts();
   view.innerHTML=h;view.scrollTop=sc;
   $('#ttl').textContent=TITLES[S.tab][0];
   let sub=TITLES[S.tab][1];
   if(S.tab==='plan'){const dd=planDates();sub=dd.filter(function(d){const p=S.plan[d];return p&&p.kind;}).length+' of '+dd.length+' dinners decided this week';}
   if(S.tab==='shifts')sub='Tap a name to edit their shift';
+  if(S.tab==='fridge'){const it=S.fridge.items||[],gg=fridgeGroups(it,todayISO());sub=it.length?it.length+(it.length===1?' item':' items')+(gg.soon.length?' · '+gg.soon.length+' to use soon':''):'What you have at home';}
   if(S.tab==='recipes'){const n=Object.keys(S.recipes).length;sub=n?n+' saved':'Your own cookbook';}
   if(S.tab==='shop'){const nn=shopCount();sub=nn+(nn===1?' item':' items')+' to buy · '+(S.shop.horizon==='all'?'all planned dinners':'next '+S.shop.horizon+' days');}
   $('#topact').innerHTML=topActs();
@@ -1249,7 +1432,7 @@ function openAddRecipe(){
 // plan picker
 function putPlan(iso,dinner,lunch){
   const doc={date:iso};
-  if(dinner&&dinner.kind){doc.kind=dinner.kind;if(dinner.rid)doc.rid=dinner.rid;if(dinner.portions!=null&&dinner.portions!=='')doc.portions=dinner.portions;}
+  if(dinner&&dinner.kind){doc.kind=dinner.kind;if(dinner.rid)doc.rid=dinner.rid;if(dinner.portions!=null&&dinner.portions!=='')doc.portions=dinner.portions;if(dinner.cooked)doc.cooked=dinner.cooked;}
   if(lunch&&lunch.kind)doc.lunch=lunch;
   if(!doc.kind&&!doc.lunch)return write('plan/'+iso,null);
   return write('plan/'+iso,doc);
@@ -1362,7 +1545,7 @@ function openRules(){
         h+='<div class="set-lbl">Data</div>';
         h+='<button class="opt" data-act="backup-restore"><span class="ic">{ }</span><span><b>Import shifts</b><span>Paste the shifts JSON Claude gives you.</span></span></button>';
       }
-      h+='<div class="small muted" style="text-align:center;padding-top:4px">Version 26 Nov, 23:40</div>';
+      h+='<div class="small muted" style="text-align:center;padding-top:4px">Version 27 Nov, 00:40</div>';
       return h;
     },
     foot:function(){return '<button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="save-rules">Save</button>';}});
@@ -1614,6 +1797,17 @@ const ACT={
       applyBuiltins();persistLocal();document.querySelectorAll('.overlay').forEach(function(o){o.remove();});render(true);
       toast(added+' days added'+(kept?', '+kept+' left as you had them':'')+'. Times filled from your presets where known.');return;
     }
+    if(d&&d.kitchenTable===1&&d.fridgeOnly&&Array.isArray(d.fridge)){
+      const t=todayISO(),add=[];
+      d.fridge.forEach(function(x){
+        if(!x||!x.name)return;
+        const q=x.q==null||x.q===''?null:Number(x.q);
+        add.push(fridgeRec(String(x.name),isNaN(q)?null:q,x.u||'',x.aisle||null,t,x.use||undefined));
+      });
+      S.fridge=Object.assign({},S.fridge,{items:(S.fridge.items||[]).concat(add),from:S.fridge.from||t});
+      persistLocal();document.querySelectorAll('.overlay').forEach(function(o){o.remove();});render(true);
+      toast(add.length+' items added to the fridge.');return;
+    }
     toast('That isn’t shifts or recipes JSON.');
   },
   'import-ics':function(){if(guardWrite())openIcs();},
@@ -1641,12 +1835,45 @@ const ACT={
     inp.value='';
     saveShop({extras:(S.shop.extras||[]).concat([{id:uid('x'),name:v,done:false}])});
   },
+  'fridge-add':function(){if(guardWrite())openFridgeAdd();},
+  'fridge-add-go':function(el){
+    const c=ctxOf(el),t=todayISO(),add=[];
+    String(c.text||'').split('\n').forEach(function(line){const p=parseIng(line);if(p)add.push(fridgeRec(p.n,p.q,p.u,p.aisle,t));});
+    if(!add.length){toast('Type at least one item.');return;}
+    closeSheet(el);saveFridge((S.fridge.items||[]).concat(add));toast(add.length+(add.length===1?' item':' items')+' added.');
+  },
+  'fridge-edit':function(el){if(guardWrite())openFridgeEdit(el.dataset.id);},
+  'fridge-save':function(el){
+    const c=ctxOf(el),d=c.d,name=String(d.name||'').trim();
+    if(!name){toast('Give it a name.');return;}
+    const q=d.q===''||d.q==null?null:Number(d.q);
+    saveFridge((S.fridge.items||[]).map(function(i){return i.id===c.id?Object.assign({},i,{name:name,q:isNaN(q)?null:q,u:d.u||'',use:d.use||null}):i;}));
+    closeSheet(el);
+  },
+  'fridge-del':function(el){const c=ctxOf(el);saveFridge((S.fridge.items||[]).filter(function(i){return i.id!==c.id;}));closeSheet(el);},
+  'mc-open':function(){if(guardWrite())openMorning();},
+  'mc-star':function(el){const c=ctxOf(el),n=Number(el.dataset.n);c.r=c.r===n?0:n;c.render();},
+  'mc-p':function(el){const c=ctxOf(el);c.p=Math.max(1,Math.min(24,c.p+Number(el.dataset.d)));c.render();},
+  'mc-yes':function(el){
+    const c=ctxOf(el),m=c.list[c.i];
+    const cur=S.plan[m.date],already=cur&&(m.slot==='dinner'?cur.cooked:(cur.lunch&&cur.lunch.cooked));
+    if(!already)recordMeal(m,true,c.p,c.r);
+    mcFinish(c);
+  },
+  'mc-no':function(el){
+    const c=ctxOf(el),m=c.list[c.i];
+    const cur=S.plan[m.date],already=cur&&(m.slot==='dinner'?cur.cooked:(cur.lunch&&cur.lunch.cooked));
+    if(!already)recordMeal(m,false,0,0);
+    mcFinish(c);
+  },
   'shop-finish':function(){
     if(!guardWrite())return;
     const sp=Object.assign({},S.shop.shopped||{});
+    const bought=fridgeFromShopping(S,shopDates(),todayISO());
     shopDates().forEach(function(d){mealsOn(S,d).forEach(function(m){sp[m.key]=true;});});
+    if(bought.length){S.fridge=Object.assign({},S.fridge,{items:(S.fridge.items||[]).concat(bought),from:S.fridge.from||todayISO()});persistLocal();}
     saveShop({shopped:sp,checked:{},extras:(S.shop.extras||[]).filter(function(e){return !e.done;})});
-    toast('Done. Those dinners are marked as shopped for.');
+    toast(bought.length?'Done. '+bought.length+(bought.length===1?' item':' items')+' added to the fridge.':'Done. Those dinners are marked as shopped for.');
   },
   'shop-reset':function(){
     if(!guardWrite())return;
@@ -1709,7 +1936,7 @@ async function init(){
   }catch(e){}
   if(DB){subscribe();}
   else{
-    STANDALONE=true;loadLocal();applyBuiltins();if(!lsGet('kt-hz')){S.shop.horizon='all';lsSet('kt-hz','1');persistLocal();}syStart();
+    STANDALONE=true;loadLocal();if(!S.fridge.from){S.fridge.from=todayISO();}applyBuiltins();if(!lsGet('kt-hz')){S.shop.horizon='all';lsSet('kt-hz','1');persistLocal();}syStart();
     const k=lsGet('kt-key');
     if(k){SAMPLE=makeApiSample(k);try{SAMPLE_LIM=await SAMPLE.limits();}catch(e){}}
     if(lsGet('kt-probe')===null&&!lsSet('kt-probe','1'))S.noStore=true;
@@ -1717,8 +1944,10 @@ async function init(){
     if('serviceWorker' in navigator&&/^https?:/.test(location.protocol)){navigator.serviceWorker.register('sw.js').catch(function(){});}
   }
   render(true);
+  setTimeout(maybeMorning,1500);
 }
 init();
+document.addEventListener('visibilitychange',function(){if(!document.hidden)setTimeout(maybeMorning,900);});
 })();
 </script>
 </body>
