@@ -792,7 +792,7 @@ function fridgeGroups(items,today,loc,ev){
 }
 const CAT_LABEL={every:'Everyday',soon:'Use soon',meat:'Meat & fish',meals:'Ready meals & desserts',dairy:'Dairy & eggs',veg:'Fruit & veg',bread:'Bread & bakery',other:'Other',sauces:'Sauces & jars',freezer:'Freezer',breakfast:'Breakfast',dry:'Rice, pasta & tins',baking:'Baking',snacks:'Snacks & treats',supp:'Drinks & supplements',spices:'Spices & seasonings'};
 // Fastest to go off or get used up first, slowest last.
-const CAT_ORDER={fridge:['every','soon','meat','meals','dairy','veg','bread','snacks','other','sauces','freezer'],pantry:['every','soon','bread','veg','dairy','breakfast','dry','baking','snacks','supp','sauces','spices','other']};
+const CAT_ORDER={fridge:['every','soon','meat','dairy','veg','bread','snacks','meals','other','sauces','freezer'],pantry:['every','soon','bread','veg','dairy','breakfast','dry','baking','snacks','supp','sauces','spices','meals','other']};
 function fridgeCat(i){
   const n=String(i.name||'').toLowerCase();
   if(i.aisle==='Frozen')return 'freezer';
@@ -1678,7 +1678,7 @@ function openRules(){
         h+='<div class="set-lbl">Data</div>';
         h+='<button class="opt" data-act="backup-restore"><span class="ic">{ }</span><span><b>Import shifts</b><span>Paste the shifts JSON Claude gives you.</span></span></button>';
       }
-      h+='<div class="small muted" style="text-align:center;padding-top:4px">Version 27 Nov, 16:20</div>';
+      h+='<div class="small muted" style="text-align:center;padding-top:4px">Version 27 Nov, 16:32</div>';
       return h;
     },
     foot:function(){return '<button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="save-rules">Save</button>';}});
