@@ -924,7 +924,7 @@ function useLabel(use,today){
 // ===== LOGIC END =====
 
 // ---------- state ----------
-const S={recipes:{},shifts:{},plan:{},settings:mergeSettings(null),shop:{checked:{},extras:[],horizon:'all'},fridge:{items:[],from:null},
+const S={recipes:{},shifts:{},plan:{},settings:mergeSettings(null),shop:{checked:{},extras:[],horizon:5},fridge:{items:[],from:null},
   ui:{},ft:'fridge',fq:'',tab:'plan',planOff:0,shiftOff:0,rq:'',rtag:'',loaded:{},canWrite:true,live:false,slow:false};
 let DB=null,SAMPLE=null,SAMPLE_LIM=null,pendingRender=false,STANDALONE=false;
 function lsGet(k){try{return localStorage.getItem(k);}catch(e){return null;}}
@@ -949,7 +949,7 @@ function syItems(){
 function syApply(k,v){
   if(k==='settings')S.settings=mergeSettings(v);
   else if(k==='fridge'){S.fridge=Object.assign({items:[],from:null},v||{});S.fridge.items=fridgeDedupe(S.fridge.items||[]);fridgeFill(S);}
-  else if(k==='shop')S.shop=Object.assign({checked:{},extras:[],horizon:'all',shopped:{}},v||{});
+  else if(k==='shop')S.shop=Object.assign({checked:{},extras:[],horizon:5,shopped:{}},v||{});
   else{const m={r:S.recipes,s:S.shifts,p:S.plan}[k.charAt(0)];if(m)m[k.slice(2)]=v;}
 }
 function syRemove(k){const m={r:S.recipes,s:S.shifts,p:S.plan}[k.charAt(0)];if(m&&k.charAt(1)===':')delete m[k.slice(2)];}
@@ -1053,7 +1053,7 @@ function loadLocal(){
   const raw=lsGet('kt-data');if(!raw)return;
   try{const d=JSON.parse(raw);
     S.recipes=d.recipes||{};Object.keys(S.recipes).forEach(function(k){const r=S.recipes[k];if(r&&/^Starter version from Claude/i.test(r.notes||''))r.notes='';});S.shifts=d.shifts||{};S.plan=d.plan||{};S.settings=mergeSettings(d.settings);
-    S.shop=Object.assign({checked:{},extras:[],horizon:'all',shopped:{}},d.shop||{});
+    S.shop=Object.assign({checked:{},extras:[],horizon:5,shopped:{}},d.shop||{});
     S.fridge=Object.assign({items:[],from:null},d.fridge||{});
     if(!d.fridge||lsGet('kt-fl')==='1'){S.fridgeLost=true;lsSet('kt-fl','1');}
   }catch(e){}
@@ -1116,7 +1116,7 @@ const queues={};
 function localApply(path,data){
   const p=path.split('/'),col=p[0],id=p[1];
   if(col==='settings'){S.settings=mergeSettings(data);}
-  else if(col==='shopping'){S.shop=Object.assign({checked:{},extras:[],horizon:'all',shopped:{}},data||{});}
+  else if(col==='shopping'){S.shop=Object.assign({checked:{},extras:[],horizon:5,shopped:{}},data||{});}
   else if(data===null){delete S[col][id];}
   else{S[col][id]=Object.assign({id:id},data);}
 }
@@ -1143,7 +1143,7 @@ function subscribe(){
   DB.collection('shifts').where('date','>=',cutoff).onSnapshot(function(s){S.shifts=fromSnap(s);markLoaded('shifts');},err('shifts'));
   DB.collection('plan').where('date','>=',cutoff).onSnapshot(function(s){S.plan=fromSnap(s);markLoaded('plan');},err('plan'));
   DB.doc('settings/main').onSnapshot(function(d){S.settings=mergeSettings(d.exists?d.data():null);markLoaded('settings');},err('settings'));
-  DB.doc('shopping/state').onSnapshot(function(d){S.shop=Object.assign({checked:{},extras:[],horizon:'all',shopped:{}},d.exists?d.data():{});markLoaded('shop');},err('shop'));
+  DB.doc('shopping/state').onSnapshot(function(d){S.shop=Object.assign({checked:{},extras:[],horizon:5,shopped:{}},d.exists?d.data():{});markLoaded('shop');},err('shop'));
 }
 
 // ---------- helpers for views ----------
@@ -1167,17 +1167,17 @@ function recipeName(id){const r=S.recipes[id];return r?r.name:'Deleted recipe';}
 function planBase(){const t=todayISO();return dowOf(t)===1?t:addDays(mondayISO(t),7);}
 function planMin(){return dowOf(todayISO())===1?0:-1;}
 function planDates(){const t=todayISO(),b=addDays(planBase(),S.planOff*7),a=[];for(let i=0;i<7;i++){const d=addDays(b,i);if(d>=t)a.push(d);}return a;}
+function horizonN(){const h=Number(S.shop.horizon);return h>=3&&h<=5?h:5;} // 5 days is the maximum
 function horizonDates(){
-  const t=todayISO(),h=S.shop.horizon;
-  if(h==='all'){return Object.keys(S.plan).filter(function(d){return d>=t;}).sort();}
-  const a=[];for(let i=0;i<h;i++)a.push(addDays(t,i));return a;
+  const t=todayISO(),n=horizonN();
+  const a=[];for(let i=0;i<n;i++)a.push(addDays(t,i));return a;
 }
 function shopDates(){
   return horizonDates().filter(function(d){return mealsOn(S,d).some(function(m){const p=S.plan[d]||{};return !(m.slot==='lunch'?(p.lunch&&p.lunch.cooked):p.cooked);});});
 }
 function shoppedDates(){return [];}
 function saveShop(patch){
-  S.shop=Object.assign({checked:{},extras:[],horizon:'all',shopped:{}},S.shop,patch);
+  S.shop=Object.assign({checked:{},extras:[],horizon:5,shopped:{}},S.shop,patch);
   const o={checked:S.shop.checked||{},extras:S.shop.extras||[],horizon:S.shop.horizon,shopped:S.shop.shopped||{},evBought:S.shop.evBought||{},sure:S.shop.sure||{}};
   const keep={};Object.keys(o.shopped).forEach(function(k){if(k.slice(0,10)>=addDays(todayISO(),-14))keep[k]=true;});o.shopped=keep;
   write('shopping/state',o);render(true);
@@ -1297,13 +1297,13 @@ function ddHtml(key,title,n,inner,defOpen,extra){
 function viewShop(){
   const data=buildShopping(S,shopDates());
   const ck=S.shop.checked||{};
-  const hz=S.shop.horizon;
+  const hz=horizonN();
   const ex=S.shop.extras||[];
   const total=data.aisles.reduce(function(n,a){return n+a.items.length;},0);
   const left=data.aisles.reduce(function(n,a){return n+a.items.filter(function(i){return !ck[i.key];}).length;},0)+ex.filter(function(e){return !e.done;}).length;
   const sd=shopDates().length;
   let h='<div class="stack"><div class="seg" role="group" aria-label="Days to shop for">'
-   +[[3,'3'],[4,'4'],[5,'5'],[6,'6'],[7,'7'],['all','All']].map(function(o){return '<button aria-pressed="'+(hz===o[0])+'" data-act="horizon" data-h="'+o[0]+'">'+o[1]+'</button>';}).join('')+'</div>';
+   +[[3,'3 days'],[4,'4 days'],[5,'5 days']].map(function(o){return '<button aria-pressed="'+(hz===o[0])+'" data-act="horizon" data-h="'+o[0]+'">'+o[1]+'</button>';}).join('')+'</div>';
   h+='<div class="addpill"><input id="extra" placeholder="Add something else" autocomplete="off"><button data-act="add-extra" aria-label="Add">+</button></div>';
   const evn=everydayList(S),st=data.staples,evb=S.shop.evBought||{};
   if(evn.length||st.length){
@@ -1479,7 +1479,7 @@ function render(force){
   if(S.tab==='shifts')sub='Tap a name to edit their shift';
   if(S.tab==='fridge'){const it=S.fridge.items||[],gg=fridgeGroups(it,todayISO());sub=it.length?it.length+(it.length===1?' item':' items')+(gg.soon.length?' · '+gg.soon.length+' to use soon':''):'What you have at home';}
   if(S.tab==='recipes'){const n=Object.keys(S.recipes).length;sub=n?n+' saved':'Your own cookbook';}
-  if(S.tab==='shop'){const nn=shopCount();sub=nn+(nn===1?' item':' items')+' to buy · '+(S.shop.horizon==='all'?'all planned dinners':'next '+S.shop.horizon+' days');}
+  if(S.tab==='shop'){const nn=shopCount();sub=nn+(nn===1?' item':' items')+' to buy · '+'next '+horizonN()+' days';}
   $('#topact').innerHTML=topActs();
   $('#sub').hidden=!sub;
   $('#sub').textContent=sub;
@@ -1771,7 +1771,7 @@ function openRules(){
         h+='<div class="set-lbl">Data</div>';
         h+='<button class="opt" data-act="backup-restore"><span class="ic">{ }</span><span><b>Import shifts</b><span>Paste the shifts JSON Claude gives you.</span></span></button>';
       }
-      h+='<div class="small muted" style="text-align:center;padding-top:4px">Version 27 Nov, 18:31</div>';
+      h+='<div class="small muted" style="text-align:center;padding-top:4px">Version 27 Nov, 18:44</div>';
       return h;
     },
     foot:function(){return '<button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="save-rules">Save</button>';}});
@@ -2046,7 +2046,7 @@ const ACT={
     applyIcs(c,t);
   },
   'ics-saved':function(el){const c=ctxOf(el),u=lsGet('kt-ics');if(u)importFromLink(c,u);},
-  horizon:function(el){saveShop({horizon:el.dataset.h==='all'?'all':Number(el.dataset.h)});},
+  horizon:function(el){saveShop({horizon:Math.min(5,Math.max(3,Number(el.dataset.h)||5))});},
   tick:function(el){
     if(!guardWrite())return;
     const ck=Object.assign({},S.shop.checked||{}),k=el.dataset.key;if(ck[k])delete ck[k];else ck[k]=true;
@@ -2248,7 +2248,7 @@ async function init(){
   }catch(e){}
   if(DB){subscribe();}
   else{
-    STANDALONE=true;loadLocal();if(!S.fridge.from){S.fridge.from=todayISO();}{const n0=(S.fridge.items||[]).length;S.fridge.items=fridgeDedupe(S.fridge.items||[]);const nf=fridgeFill(S);if(S.fridge.items.length!==n0||nf)persistLocal();}applyBuiltins();if(!lsGet('kt-hz')){S.shop.horizon='all';lsSet('kt-hz','1');persistLocal();}syStart();
+    STANDALONE=true;loadLocal();if(!S.fridge.from){S.fridge.from=todayISO();}{const n0=(S.fridge.items||[]).length;S.fridge.items=fridgeDedupe(S.fridge.items||[]);const nf=fridgeFill(S);if(S.fridge.items.length!==n0||nf)persistLocal();}applyBuiltins();if(!lsGet('kt-hz')){S.shop.horizon=5;lsSet('kt-hz','1');persistLocal();}syStart();
     const k=lsGet('kt-key');
     if(k){SAMPLE=makeApiSample(k);try{SAMPLE_LIM=await SAMPLE.limits();}catch(e){}}
     if(lsGet('kt-probe')===null&&!lsSet('kt-probe','1'))S.noStore=true;
