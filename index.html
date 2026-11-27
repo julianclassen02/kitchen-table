@@ -1314,7 +1314,7 @@ function viewShop(){
       const lab=boughtLabel(evb[n.toLowerCase()],todayISO());
       return '<button class="mi'+(ck[evKey(n)]?' done':'')+'" data-act="tick" data-key="'+esc(evKey(n))+'"><span class="ico">'+iconFor(n,'Other')+'</span><span class="nm"><span class="t"><span class="cap">'+esc(n)+'</span></span>'+(lab?'<small>'+esc(lab)+'</small>':'')+'</span><span class="cb">✓</span></button>';}).join('')+'</div>';
     if(st.length)inner+='<div class="mgroup"><h3>Pantry staples</h3>'+st.map(function(i){return shopItemHtml(i,!!ck[i.key],i.aisle);}).join('')+'</div>';
-    h+=ddHtml('staples','Staples & everyday',sl,inner,true);
+    h+=ddHtml('staples','Staples & everyday',sl,inner,false);
   }
   if(!total&&!ex.length){
     h+='<div class="empty"><h3>'+(sd?'Nothing more to buy':'Nothing to buy yet')+'</h3><p class="muted" style="margin:0">'+(sd?'Everything the planned dinners need is already at home. Plan more dinners and anything missing appears here.':'Choose dinners on the Plan tab and the ingredients land here, merged and sorted by aisle.')+'</p><button class="btn" data-act="tab" data-tab="plan">Go to the plan</button></div>';
@@ -1771,7 +1771,7 @@ function openRules(){
         h+='<div class="set-lbl">Data</div>';
         h+='<button class="opt" data-act="backup-restore"><span class="ic">{ }</span><span><b>Import shifts</b><span>Paste the shifts JSON Claude gives you.</span></span></button>';
       }
-      h+='<div class="small muted" style="text-align:center;padding-top:4px">Version 27 Nov, 18:22</div>';
+      h+='<div class="small muted" style="text-align:center;padding-top:4px">Version 27 Nov, 18:31</div>';
       return h;
     },
     foot:function(){return '<button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="save-rules">Save</button>';}});
