@@ -545,7 +545,10 @@ function buildShopping(S,dates){
   const out={},staples=[];
   // what's already at home (fridge + pantry) comes off the list; shared pool so two lines can't use the same stock twice
   const pool=((S.fridge&&S.fridge.items)||[]).filter(function(f){return f.q!=null&&f.q>0;}).map(function(f){return {name:f.name,u:uk(f.u),q:f.q};});
+  const homeAll=((S.fridge&&S.fridge.items)||[]).filter(function(f){return f.q==null||f.q>0;});
   map.forEach(function(it){
+    // no amount on one side (e.g. "Linguine" in the pantry, no weight saved): having the item at all counts as covered
+    if(!isStaple(it.name,S.settings.staples)&&homeAll.some(function(f){return (it.q==null||f.q==null)&&nameMatch(f.name,it.name)>0;})){it.have=1;it.covered=true;return;}
     if(it.q!=null&&!isStaple(it.name,S.settings.staples)){
       for(const lvl of [2,1]){
         for(const f of pool){
@@ -1695,7 +1698,7 @@ function openRules(){
         h+='<div class="set-lbl">Data</div>';
         h+='<button class="opt" data-act="backup-restore"><span class="ic">{ }</span><span><b>Import shifts</b><span>Paste the shifts JSON Claude gives you.</span></span></button>';
       }
-      h+='<div class="small muted" style="text-align:center;padding-top:4px">Version 27 Nov, 17:12</div>';
+      h+='<div class="small muted" style="text-align:center;padding-top:4px">Version 27 Nov, 17:21</div>';
       return h;
     },
     foot:function(){return '<button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="save-rules">Save</button>';}});
