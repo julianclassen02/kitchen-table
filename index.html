@@ -754,7 +754,7 @@ function fridgeCat(i){
   if(i.aisle==='Frozen')return 'freezer';
   if(/\b(soup|crumble|custard|trifle|pudding|dessert|ready meal|lasagne|leftover)/.test(n))return 'meals';
   if(/\b(whey|protein|creatine|supplement)/.test(n))return 'supp';
-  if(/\b(oat|porridge|weetabix|cereal|granola|muesli|chia)/.test(n))return 'breakfast';
+  if(/\b(oat|porridge|weetabix|cereal|granola|muesli|chia|honey|syrup|jam|marmalade|peanut butter|nutella)/.test(n))return 'breakfast';
   if(/\b(flour|cocoa|baking|sugar|yeast|cornflour|icing)/.test(n))return 'baking';
   const pantry=locOf(i)==='pantry';
   switch(i.aisle||guessAisle(i.name)){
@@ -1619,7 +1619,7 @@ function openRules(){
         h+='<div class="set-lbl">Data</div>';
         h+='<button class="opt" data-act="backup-restore"><span class="ic">{ }</span><span><b>Import shifts</b><span>Paste the shifts JSON Claude gives you.</span></span></button>';
       }
-      h+='<div class="small muted" style="text-align:center;padding-top:4px">Version 27 Nov, 11:20</div>';
+      h+='<div class="small muted" style="text-align:center;padding-top:4px">Version 27 Nov, 11:40</div>';
       return h;
     },
     foot:function(){return '<button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="save-rules">Save</button>';}});
@@ -1873,15 +1873,16 @@ const ACT={
       toast(added+' days added'+(kept?', '+kept+' left as you had them':'')+'. Times filled from your presets where known.');return;
     }
     if(d&&d.kitchenTable===1&&d.fridgeOnly&&Array.isArray(d.fridge)){
-      const t=todayISO(),add=[];
+      const t=todayISO(),add=[];let dup=0;
       d.fridge.forEach(function(x){
         if(!x||!x.name)return;
+        if((S.fridge.items||[]).concat(add).some(function(f){return nameMatch(f.name,String(x.name))===2;})){dup++;return;}
         const q=x.q==null||x.q===''?null:Number(x.q);
         add.push(fridgeRec(String(x.name),isNaN(q)?null:q,x.u||'',x.aisle||null,t,(x.use===null?null:(x.use||undefined)),x.loc));
       });
       S.fridge=Object.assign({},S.fridge,{items:(S.fridge.items||[]).concat(add),from:S.fridge.from||t});
       persistLocal();document.querySelectorAll('.overlay').forEach(function(o){o.remove();});render(true);
-      toast(add.length+' items added to the fridge.');return;
+      toast(add.length+(add.length===1?' item':' items')+' added'+(dup?', '+dup+' already there':'')+'.');return;
     }
     toast('That isn’t shifts or recipes JSON.');
   },
