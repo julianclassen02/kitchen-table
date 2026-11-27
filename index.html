@@ -106,6 +106,10 @@ h1,h2,h3{font-family:var(--font-display);margin:0;letter-spacing:-.01em;text-wra
 
 /* fridge + morning check */
 .mi.fi .qty{flex:none;font-weight:600;font-size:15px;color:var(--ink);background:var(--paper);border-radius:99px;padding:4px 11px}
+.pickup{padding:12px 14px}
+.pickup .pk{display:flex;flex-direction:column;gap:2px;margin:4px 0 6px}
+.pickup .pk small{color:var(--muted,#6b7a72);font-size:13px}
+.pickup .pkl{font-size:15px}
 .unsure{padding:10px 14px}
 .unsure .us{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 0}
 .unsure .us+.us{border-top:1px dashed var(--line,#dfe5e1)}
@@ -398,7 +402,7 @@ const DEF={
   commute:30,dinnerTime:'18:30',cookBuffer:45,
   vAnchor:'2026-11-23',vAnchorType:'early',vDays:[1,2,3,4,5],
   vEarlyStart:'08:00',vEarlyEnd:'16:30',vLateStart:'11:30',vLateEnd:'20:00',vPacked:true,
-  takeaway:true,jFactor:1.3,vFactor:1,everyday:'Greek yoghurt, Sourdough, Eggs, Milk',
+  takeaway:true,jFactor:1.3,vFactor:1,jStore:'Sainsbury’s / Lidl / Aldi',vStore:'Tesco',jCommute:30,pickupLead:20,pickupOff:'15:00',pickupDefault:'julian',everyday:'Greek yoghurt, Sourdough, Eggs, Milk',
   staples:'salt, pepper, black pepper, olive oil, vegetable oil, oil, water',
   presets:[
     {id:'pls-fri-early',name:'PLS Friday early',match:'pls, premier league',days:[5],leave:'08:00',ret:'18:00',food:false,away:false},
@@ -517,6 +521,40 @@ function isStaple(name,staples){
   const k=ingKey(name);
   return String(staples||'').split(',').map(function(x){return ingKey(x);}).filter(Boolean).some(function(s){
     return k===s||new RegExp('\\b'+s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b').test(k);});
+}
+// ---- Pickup reminder: what's missing for tonight (and tomorrow), who picks it up, and when ----
+function fmtMin(m){m=Math.max(0,Math.round(m));return String(Math.floor(m/60)%24).padStart(2,'0')+':'+String(m%60).padStart(2,'0');}
+function pickupPlan(S,today,nowMin){
+  const st=S.settings||{},tomorrow=addDays(today,1);
+  const flat=function(d){const o={};d.aisles.forEach(function(a){a.items.forEach(function(i){o[i.key]=i;});});return o;};
+  const tonightHas=mealsOn(S,today).length>0;
+  const A=flat(buildShopping(S,[today])),B=flat(buildShopping(S,[today,tomorrow]));
+  const info=dayInfo(S,today);
+  const items=[];
+  const hideTonight=nowMin!=null&&info.dinnerAt&&nowMin>info.dinnerAt;
+  Object.keys(A).forEach(function(k){if(!hideTonight)items.push({name:A[k].name,q:B[k]&&B[k].q!=null?B[k].q:A[k].q,u:A[k].u,when:'tonight'});}); // buy enough for both nights in one go
+  Object.keys(B).forEach(function(k){if(!A[k])items.push({name:B[k].name,q:B[k].q,u:B[k].u,when:'tomorrow'});});
+  const out={items:items,who:null,at:null,store:'',skip:''};
+  if(!items.length)return out;
+  let who=info.cook;if(who!=='julian'&&who!=='viv')who=st.pickupDefault==='viv'?'viv':'julian';
+  out.who=who;out.store=(who==='viv'?st.vStore:st.jStore)||'';
+  const lead=Number(st.pickupLead)>=0?Number(st.pickupLead):20,sh=who==='viv'?vOf(S,today):jOf(S,today);
+  let leaveWork=null;
+  if(who==='viv'&&sh.state==='work')leaveWork=(mins(sh.end)==null?17*60:mins(sh.end));
+  else if(who==='julian'&&sh.state==='work'&&info.jHomeAt)leaveWork=info.jHomeAt-(Number(st.jCommute)>=0?Number(st.jCommute):30);
+  if(leaveWork!=null){
+    if(leaveWork>=21*60+30){out.skip='late';return out;}
+    out.at=Math.max(7*60,leaveWork-lead);
+  }else out.at=mins(st.pickupOff)==null?15*60:mins(st.pickupOff);
+  return out;
+}
+function pickupText(P,names){
+  const nm=function(i){return i.name+(i.q!=null?' ('+fmtQ(i.q,i.u)+')':'');};
+  const t=P.items.filter(function(i){return i.when==='tonight';}).map(nm),n=P.items.filter(function(i){return i.when==='tomorrow';}).map(nm);
+  let s='';
+  if(t.length)s+='Tonight: '+t.join(', ')+'. ';
+  if(n.length)s+='For tomorrow: '+n.join(', ')+'. ';
+  return s.trim();
 }
 function mealWeight(S,iso,slot){
   const st=S.settings||{},jf=Number(st.jFactor)>0?Number(st.jFactor):1.3,vf=Number(st.vFactor)>0?Number(st.vFactor):1;
@@ -1342,6 +1380,8 @@ function viewShop(){
   if(!total&&!ex.length){
     h+='<div class="empty"><h3>'+(sd?'Nothing more to buy':'Nothing to buy yet')+'</h3><p class="muted" style="margin:0">'+(sd?'Everything the planned dinners need is already at home. Plan more dinners and anything missing appears here.':'Choose dinners on the Plan tab and the ingredients land here, merged and sorted by aisle.')+'</p><button class="btn" data-act="tab" data-tab="plan">Go to the plan</button></div>';
   }
+  {const P=pickupPlan(S,todayISO(),new Date().getHours()*60+new Date().getMinutes());
+    if(P.items.length&&P.who)h+='<div class="card pickup"><div class="label">On the way home</div><div class="pk"><b>'+(P.who==='viv'?'Viv':'Julian')+(P.store?' · '+esc(P.store):'')+'</b>'+(P.skip==='late'?'<small>Home too late for the shops, so no reminder today.</small>':'<small>Reminder at '+fmtMin(P.at)+'</small>')+'</div><div class="pkl">'+esc(pickupText(P))+'</div></div>';}
   if(data.unsure&&data.unsure.length)h+='<div class="card unsure"><div class="label">Check these</div>'+data.unsure.map(function(u){return '<div class="us"><div class="ut"><b class="cap">'+esc(u.name)+'</b><small>Have '+esc(fmtQ(u.haveQ,u.haveU))+' · need '+esc(fmtQ(u.need,u.u)||'some')+'. Enough?</small></div><span class="ub"><button class="btn sm" data-act="unsure-yes" data-key="'+esc(u.key)+'">Yes</button><button class="btn ghost sm" data-act="unsure-no" data-key="'+esc(u.key)+'">Buy</button></span></div>';}).join('')+'</div>';
   const exBy={};
   ex.forEach(function(e){let a=guessAisle(e.name);if(AISLES.indexOf(a)<0)a='Other';(exBy[a]=exBy[a]||[]).push(e);});
@@ -1782,6 +1822,8 @@ function openRules(){
       h+='<div class="sect"><div class="set-hd"><span class="ic">🧂</span><span><b>Staples</b><span>Always in the cupboard. They’re listed separately so they don’t clutter the shop.</span></span></div><div class="field"><textarea data-bind="staples" style="min-height:84px" aria-label="Staples">'+esc(d.staples)+'</textarea></div></div>';
       h+='<div class="sect"><div class="set-hd"><span class="ic">🔁</span><span><b>Everyday items</b><span>Things you get through every few days. They sit at the top of the shopping list as a reminder, with when you last bought them, and at the top of the fridge and pantry.</span></span></div><div class="field"><textarea data-bind="everyday" style="min-height:64px" aria-label="Everyday items">'+esc(d.everyday)+'</textarea></div></div>';
       h+='<div class="sect"><div class="set-hd"><span class="ic">🍽️</span><span><b>Portion size</b><span>How much each of you eats compared with a standard portion. This only changes ingredient amounts in the shop and fridge. Portion counts stay whole numbers.</span></span></div><div class="two"><div class="field"><label for="jf">Julian</label><input id="jf" type="number" inputmode="decimal" step="0.05" min="0.5" max="3" data-bind="jFactor" value="'+esc(d.jFactor)+'"></div><div class="field"><label for="vf">Viv</label><input id="vf" type="number" inputmode="decimal" step="0.05" min="0.5" max="3" data-bind="vFactor" value="'+esc(d.vFactor)+'"></div></div></div>';
+      h+='<div class="set-lbl">Pickup reminders</div>';
+      h+='<div class="sect"><div class="set-hd"><span class="ic">🛍️</span><span><b>Pop in on the way home</b><span>If something is missing for tonight or tomorrow’s dinner, whoever leaves work first gets one reminder before they leave.</span></span></div><div class="two"><div class="field"><label for="js">Julian’s usual stop</label><input id="js" data-bind="jStore" value="'+esc(d.jStore||'')+'"></div><div class="field"><label for="vs">Viv’s usual stop</label><input id="vs" data-bind="vStore" value="'+esc(d.vStore||'')+'"></div></div><div class="two"><div class="field"><label for="jc">Julian’s drive home (min)</label><input id="jc" type="number" inputmode="numeric" min="0" max="120" data-bind="jCommute" value="'+esc(d.jCommute)+'"></div><div class="field"><label for="pl">Remind before leaving (min)</label><input id="pl" type="number" inputmode="numeric" min="0" max="120" data-bind="pickupLead" value="'+esc(d.pickupLead)+'"></div></div><div class="two"><div class="field"><label for="po">Time on days off</label><input id="po" type="time" data-bind="pickupOff" value="'+esc(d.pickupOff||'15:00')+'"></div><div class="field"><label for="pd">If you leave together</label><select id="pd" data-bind="pickupDefault"><option value="julian"'+(d.pickupDefault!=='viv'?' selected':'')+'>Julian goes</option><option value="viv"'+(d.pickupDefault==='viv'?' selected':'')+'>Viv goes</option></select></div></div></div>';
       if(STANDALONE){
         h+='<div class="set-lbl">Devices</div>';
         h+='<div class="sect"><div class="set-hd"><span class="ic">⇄</span><span><b>Sync between devices</b><span>'+(SY.cfg?'Recipes, shifts, plans and shopping ticks match on every phone using the same code.':'Optional. Connect a free Supabase database so every phone sees the same data. Steps are in the README.')+'</span></span></div>';
@@ -1794,7 +1836,7 @@ function openRules(){
         h+='<div class="set-lbl">Data</div>';
         h+='<button class="opt" data-act="backup-restore"><span class="ic">{ }</span><span><b>Import shifts</b><span>Paste the shifts JSON Claude gives you.</span></span></button>';
       }
-      h+='<div class="small muted" style="text-align:center;padding-top:4px">Version 27 Nov, 19:32</div>';
+      h+='<div class="small muted" style="text-align:center;padding-top:4px">Version 27 Nov, 20:10</div>';
       return h;
     },
     foot:function(){return '<button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="save-rules">Save</button>';}});
@@ -1988,7 +2030,7 @@ const ACT={
     const c=ctxOf(el),d=c.d;
     d.commute=Number(d.commute)||0;d.cookBuffer=Number(d.cookBuffer)||45;
     d.vDays=(d.vDays||[]).map(Number);
-    d.jFactor=Math.min(3,Math.max(0.5,Number(d.jFactor)||1.3));d.vFactor=Math.min(3,Math.max(0.5,Number(d.vFactor)||1));
+    d.jCommute=Math.max(0,Number(d.jCommute)||30);d.pickupLead=Math.max(0,Number(d.pickupLead)>=0?Number(d.pickupLead):20);d.jFactor=Math.min(3,Math.max(0.5,Number(d.jFactor)||1.3));d.vFactor=Math.min(3,Math.max(0.5,Number(d.vFactor)||1));
     write('settings/main',d);closeSheet(el);toast('Settings saved');
   },
   'sync-save':function(el){
