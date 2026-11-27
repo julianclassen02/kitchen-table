@@ -106,6 +106,10 @@ h1,h2,h3{font-family:var(--font-display);margin:0;letter-spacing:-.01em;text-wra
 
 /* fridge + morning check */
 .mi.fi .qty{flex:none;font-weight:600;font-size:15px;color:var(--ink);background:var(--paper);border-radius:99px;padding:4px 11px}
+.unsure .us{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0}
+.unsure .us+.us{border-top:1px dashed var(--line,#dfe5e1)}
+.unsure .ut small{display:block;color:var(--muted,#6b7a72);font-size:13px}
+.unsure .ub{display:flex;gap:6px;flex:none}
 .mi small .est{color:var(--warn);font-weight:600}
 .mi small.mine{font-style:italic;opacity:.7}
 .mi.fi.warn small{color:var(--warn);font-weight:600}
@@ -548,16 +552,32 @@ function buildShopping(S,dates){
   // what's already at home (fridge + pantry) comes off the list; shared pool so two lines can't use the same stock twice
   const pool=((S.fridge&&S.fridge.items)||[]).filter(function(f){return f.q!=null&&f.q>0;}).map(function(f){return {name:f.name,u:uk(f.u),q:f.q};});
   const homeAll=((S.fridge&&S.fridge.items)||[]).filter(function(f){return f.q==null||f.q>0;});
+  const eq=(S.settings&&S.settings.unitEq)||{},sure=(S.shop&&S.shop.sure)||{},unsure=[];
   map.forEach(function(it){
-    // no amount on one side (e.g. "Linguine" in the pantry, no weight saved): having the item at all counts as covered
-    if(!isStaple(it.name,S.settings.staples)&&homeAll.some(function(f){return (it.q==null||f.q==null)&&nameMatch(f.name,it.name)>0;})){it.have=1;it.covered=true;return;}
-    if(it.q!=null&&!isStaple(it.name,S.settings.staples)){
+    const stp=isStaple(it.name,S.settings.staples);
+    // no amount on one side (everyday items): having the item at all counts as covered
+    if(!stp&&homeAll.some(function(f){return (it.q==null||f.q==null)&&nameMatch(f.name,it.name)>0;})){it.have=1;it.covered=true;return;}
+    if(it.q!=null&&!stp){
+      const orig=it.q,ru=uk(it.u);let rem=it.q,maybe=null;
       for(const lvl of [2,1]){
         for(const f of pool){
-          if(!(it.q>1e-9))break;
-          if(f.q>0&&f.u===uk(it.u)&&nameMatch(f.name,it.name)===lvl){const t=Math.min(f.q,it.q);f.q-=t;it.q-=t;it.have=(it.have||0)+t;}
+          if(!(rem>1e-9))break;
+          if(!(f.q>0)||nameMatch(f.name,it.name)!==lvl)continue;
+          const pu=eq[ingKey(f.name)+'|'+f.u+'|'+ru];
+          if(f.u===ru){const t=Math.min(f.q,rem);f.q-=t;rem-=t;}
+          else if(pu>0){const t=Math.min(f.q*pu,rem);f.q-=t/pu;rem-=t;}
+          else{
+            const g1=unitG(f.name,f.u),g2=unitG(it.name,it.u);
+            if(g1&&g2){const t=Math.min(f.q*g1,rem*g2);f.q-=t/g1;rem-=t/g2;}
+            else if(!maybe)maybe=f;
+          }
         }
       }
+      if(rem>1e-9&&maybe&&sure[it.key]!=='no'){
+        unsure.push({key:it.key,name:it.name,need:Math.round(rem*100)/100,u:it.u,haveQ:maybe.q,haveU:maybe.u,haveName:maybe.name});
+        return;
+      }
+      if(rem<orig-1e-9){it.have=(it.have||0)+(orig-rem);it.q=rem;if(rem<orig*0.05)it.q=0;}
     }
     if(it.q!=null&&it.have&&(it.u==='g'||it.u==='ml')&&it.q<10)it.q=0;
     const pk=it.q>0?packFor(it.name,it.u):null;
@@ -573,7 +593,7 @@ function buildShopping(S,dates){
     (out[a]=out[a]||[]).push(it);
   });
   const aisles=AISLES.filter(function(a){return out[a];}).map(function(a){return {aisle:a,items:out[a].sort(function(x,y){return x.name.localeCompare(y.name);})};});
-  return {aisles:aisles,staples:staples.sort(function(x,y){return x.name.localeCompare(y.name);})};
+  return {aisles:aisles,staples:staples.sort(function(x,y){return x.name.localeCompare(y.name);}),unsure:unsure};
 }
 
 function icsDate(v){
@@ -741,6 +761,27 @@ function fridgeDedupe(items){
     out[j]=m;
   });
   return out;
+}
+// Grams per one unit, per ingredient (cross-type conversions: count/can/jar/clove/tbsp -> grams). ml is treated as g for the rest.
+const UNITG=[
+  [/\bgarlic\b/,{clove:5,'':50}],
+  [/\b(chopped|plum|tinned|canned) tomatoes\b/,{can:400}],[/\bcoconut milk\b/,{can:400}],[/\bbaked beans\b/,{can:400}],
+  [/\b(chickpeas|kidney beans|black beans|cannellini beans|butter beans|borlotti beans)\b/,{can:400}],[/\btuna\b/,{can:145}],[/\bsweetcorn\b/,{can:160}],
+  [/\bcapers\b/,{jar:100,tbsp:10,tsp:3.5}],[/\bpesto\b/,{jar:190}],[/\bolives\b/,{jar:230,can:150}],[/\b(jam|chutney|pickle)\b/,{jar:340}],
+  [/\bsweet potato(es)?\b/,{'':250}],[/\bspring onions?\b/,{'':15,bunch:100}],[/\bshallots?\b/,{'':40}],[/\bonions?\b/,{'':150}],[/\bpotato(es)?\b/,{'':200}],
+  [/\bcarrots?\b/,{'':80}],[/\bcourgettes?\b/,{'':200}],[/\baubergines?\b/,{'':250}],[/\bpeppers?\b/,{'':150}],[/\btomato(es)?\b/,{'':100}],
+  [/\bcucumbers?\b/,{'':300}],[/\bleeks?\b/,{'':150}],[/\blemons?\b/,{'':60}],[/\blimes?\b/,{'':45}],[/\bavocados?\b/,{'':150}],[/\bbananas?\b/,{'':120}],[/\bapples?\b/,{'':150}],
+  [/\beggs?\b/,{'':55}],[/\bchicken breasts?\b/,{'':170}],[/\bchicken thighs?\b/,{'':110}],[/\b(salmon|cod|haddock|seabass|sea bass) fillets?\b/,{'':120}],[/\bsausages?\b/,{'':60}],
+  [/\b(bacon|rashers?)\b/,{slice:25,'':25}],[/\bbread\b/,{slice:35}],[/\bbutter\b/,{tbsp:14,tsp:5}],[/\bflour\b/,{tbsp:8,cup:125}],[/\bsugar\b/,{tbsp:12,cup:200}],
+  [/\brice\b/,{cup:185}],[/\boats\b/,{cup:90}],[/\bhoney\b/,{tbsp:21}]
+];
+const UF={g:1,kg:1000,oz:28.35,lb:453.6,ml:1,l:1000,tsp:5,tbsp:15,cup:240};
+function unitG(name,u){
+  const n=String(name||'').toLowerCase(),uu=u==='tin'?'can':(u||'');
+  for(const t of UNITG){if(t[0].test(n)&&t[1][uu]!=null)return t[1][uu];}
+  if(UF[uu]!=null)return UF[uu];
+  if(uu==='pack'){for(const p of PACKS){if(p[0].test(n))return (p[2]==='g'||p[2]==='ml')?p[1]:null;}}
+  return null;
 }
 // Standard shop pack sizes: [name pattern, size, unit]. Shopping rounds UP to whole packs; stock is consumed by recipe amounts.
 const PACKS=[
@@ -1137,7 +1178,7 @@ function shopDates(){
 function shoppedDates(){return [];}
 function saveShop(patch){
   S.shop=Object.assign({checked:{},extras:[],horizon:'all',shopped:{}},S.shop,patch);
-  const o={checked:S.shop.checked||{},extras:S.shop.extras||[],horizon:S.shop.horizon,shopped:S.shop.shopped||{},evBought:S.shop.evBought||{}};
+  const o={checked:S.shop.checked||{},extras:S.shop.extras||[],horizon:S.shop.horizon,shopped:S.shop.shopped||{},evBought:S.shop.evBought||{},sure:S.shop.sure||{}};
   const keep={};Object.keys(o.shopped).forEach(function(k){if(k.slice(0,10)>=addDays(todayISO(),-14))keep[k]=true;});o.shopped=keep;
   write('shopping/state',o);render(true);
 }
@@ -1278,6 +1319,7 @@ function viewShop(){
   if(!total&&!ex.length){
     h+='<div class="empty"><h3>'+(sd?'Nothing more to buy':'Nothing to buy yet')+'</h3><p class="muted" style="margin:0">'+(sd?'Everything the planned dinners need is already at home. Plan more dinners and anything missing appears here.':'Choose dinners on the Plan tab and the ingredients land here, merged and sorted by aisle.')+'</p><button class="btn" data-act="tab" data-tab="plan">Go to the plan</button></div>';
   }
+  if(data.unsure&&data.unsure.length)h+='<div class="card unsure"><div class="label">Check these</div>'+data.unsure.map(function(u){return '<div class="us"><div class="ut"><b>'+esc(u.name)+'</b><small>You have '+esc(fmtQ(u.haveQ,u.haveU))+'. The plan needs '+esc(fmtQ(u.need,u.u)||'some')+'. Enough?</small></div><span class="ub"><button class="btn sm" data-act="unsure-yes" data-key="'+esc(u.key)+'">Yes</button><button class="btn ghost sm" data-act="unsure-no" data-key="'+esc(u.key)+'">No, buy</button></span></div>';}).join('')+'</div>';
   const exBy={};
   ex.forEach(function(e){let a=guessAisle(e.name);if(AISLES.indexOf(a)<0)a='Other';(exBy[a]=exBy[a]||[]).push(e);});
   const exHtml=function(e){return '<button class="mi'+(e.done?' done':'')+'" data-act="tick-extra" data-id="'+esc(e.id)+'"><span class="ico">'+iconFor(e.name,'Other')+'</span><span class="nm"><span class="t"><span class="cap">'+esc(e.name)+'</span></span><small class="mine">Added by you</small></span><span class="cb">✓</span></button>';};
@@ -1729,7 +1771,7 @@ function openRules(){
         h+='<div class="set-lbl">Data</div>';
         h+='<button class="opt" data-act="backup-restore"><span class="ic">{ }</span><span><b>Import shifts</b><span>Paste the shifts JSON Claude gives you.</span></span></button>';
       }
-      h+='<div class="small muted" style="text-align:center;padding-top:4px">Version 27 Nov, 17:58</div>';
+      h+='<div class="small muted" style="text-align:center;padding-top:4px">Version 27 Nov, 18:22</div>';
       return h;
     },
     foot:function(){return '<button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="save-rules">Save</button>';}});
@@ -2030,6 +2072,18 @@ const ACT={
     saveShop({extras:ex.concat([{id:uid('x'),name:name,done:false}])});
     toast('Added '+name+' to the shopping list.');
   },
+  'unsure-yes':function(el){
+    if(!guardWrite())return;
+    const u=buildShopping(S,shopDates()).unsure.filter(function(x){return x.key===el.dataset.key;})[0];if(!u)return;
+    const st=JSON.parse(JSON.stringify(S.settings));st.unitEq=st.unitEq||{};
+    // remember: 1 of the stocked unit is worth this much of the recipe unit (enough for the amount asked)
+    st.unitEq[ingKey(u.haveName)+'|'+u.haveU+'|'+uk(u.u)]=Math.round(u.need/u.haveQ*1000)/1000;
+    write('settings/main',st);toast('Got it. I’ll count that as enough.');
+  },
+  'unsure-no':function(el){
+    if(!guardWrite())return;
+    const sure=Object.assign({},S.shop.sure||{});sure[el.dataset.key]='no';saveShop({sure:sure});
+  },
   'fridge-add':function(){if(guardWrite())openFridgeAdd();},
   'fridge-add-go':function(el){
     const c=ctxOf(el),t=todayISO(),add=[];
@@ -2082,7 +2136,7 @@ const ACT={
     });
     shopDates().forEach(function(d){mealsOn(S,d).forEach(function(m){sp[m.key]=true;});});
     if(bought.length){S.fridge=Object.assign({},S.fridge,{items:addFridgeItems(items,bought,true).items,from:S.fridge.from||todayISO()});persistLocal();}
-    saveShop({shopped:sp,checked:{},evBought:evb,extras:(S.shop.extras||[]).filter(function(e){return !e.done;})});
+    saveShop({shopped:sp,checked:{},evBought:evb,sure:{},extras:(S.shop.extras||[]).filter(function(e){return !e.done;})});
     toast(bought.length?'Done. '+bought.length+(bought.length===1?' item':' items')+' added to the fridge.':'Done. Those dinners are marked as shopped for.');
   },
   'shop-reset':function(){
