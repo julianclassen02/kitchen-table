@@ -673,9 +673,40 @@ function useByGuess(name,aisle,from){
   if(d==null)d=SHELF[a]!=null?SHELF[a]:30;
   return d?addDays(from,d):null;
 }
+const PANTRYISH=/\b(onions?|shallots?|potato(es)?|garlic|squash|pumpkin|bananas?|bread|loaf|buns?|brioche|bagels?|sourdough|eggs?)\b/i;
 function locOf(i){
   if(i.loc==='fridge'||i.loc==='pantry')return i.loc;
+  const n=String(i.name||'');
+  if(/spring onion|green onion/i.test(n))return 'fridge';
+  if(PANTRYISH.test(n))return 'pantry';
   return LONGLIFE[i.aisle]&&i.aisle!=='Frozen'?'pantry':'fridge';
+}
+// One line per item: adding something already in stock never creates a second line.
+function addFridgeItems(items,recs,sum){
+  const out=items.slice(),res={added:0,merged:0,skipped:[]};
+  recs.forEach(function(r){
+    const i=out.findIndex(function(f){return nameMatch(f.name,r.name)===2;});
+    if(i<0){out.push(r);res.added++;return;}
+    const f=out[i];
+    if(sum&&f.q!=null&&r.q!=null&&(f.u||'')===(r.u||'')){out[i]=Object.assign({},f,{q:Math.round((f.q+r.q)*100)/100,added:r.added,use:r.use||f.use});res.merged++;}
+    else if(sum&&(f.q==null||r.q==null)){out[i]=Object.assign({},f,{added:r.added,use:r.use||f.use});res.merged++;}
+    else res.skipped.push(r.name);
+  });
+  return {items:out,added:res.added,merged:res.merged,skipped:res.skipped};
+}
+function fridgeDedupe(items){
+  const out=[];
+  items.forEach(function(it){
+    const j=out.findIndex(function(f){return nameMatch(f.name,it.name)===2;});
+    if(j<0){out.push(it);return;}
+    const f=out[j];
+    let m=f;
+    if(f.q!=null&&it.q!=null&&(f.u||'')===(it.u||''))m=Object.assign({},f,{q:Math.round((f.q+it.q)*100)/100});
+    else if(f.q==null&&it.q!=null)m=Object.assign({},f,{q:it.q,u:it.u||''});
+    if(locOf(f)!==locOf(it))m=Object.assign({},m,{loc:locOf({name:m.name,aisle:m.aisle})});
+    out[j]=m;
+  });
+  return out;
 }
 function fridgeRec(name,q,u,aisle,today,use,loc){
   const a=aisle||(u==='tin'?'Tins & dry goods':guessAisle(name));
@@ -746,9 +777,9 @@ function fridgeGroups(items,today,loc,ev){
   });
   return g;
 }
-const CAT_LABEL={every:'Everyday',soon:'Use soon',meat:'Meat & fish',meals:'Ready meals & desserts',dairy:'Dairy & eggs',veg:'Fruit & veg',bread:'Bread & bakery',other:'Other',sauces:'Sauces & jars',freezer:'Freezer',breakfast:'Breakfast',dry:'Rice, pasta & tins',baking:'Baking',supp:'Drinks & supplements',spices:'Spices & seasonings'};
+const CAT_LABEL={every:'Everyday',soon:'Use soon',meat:'Meat & fish',meals:'Ready meals & desserts',dairy:'Dairy & eggs',veg:'Fruit & veg',bread:'Bread & bakery',other:'Other',sauces:'Sauces & jars',freezer:'Freezer',breakfast:'Breakfast',dry:'Rice, pasta & tins',baking:'Baking',snacks:'Snacks & treats',supp:'Drinks & supplements',spices:'Spices & seasonings'};
 // Fastest to go off or get used up first, slowest last.
-const CAT_ORDER={fridge:['every','soon','meat','meals','dairy','veg','bread','other','sauces','freezer'],pantry:['every','soon','bread','veg','dairy','breakfast','dry','baking','supp','spices','other']};
+const CAT_ORDER={fridge:['every','soon','meat','meals','dairy','veg','bread','snacks','other','sauces','freezer'],pantry:['every','soon','bread','veg','dairy','breakfast','dry','baking','snacks','supp','sauces','spices','other']};
 function fridgeCat(i){
   const n=String(i.name||'').toLowerCase();
   if(i.aisle==='Frozen')return 'freezer';
@@ -756,13 +787,14 @@ function fridgeCat(i){
   if(/\b(whey|protein|creatine|supplement)/.test(n))return 'supp';
   if(/\b(oat|porridge|weetabix|cereal|granola|muesli|chia|honey|syrup|jam|marmalade|peanut butter|nutella)/.test(n))return 'breakfast';
   if(/\b(flour|cocoa|baking|sugar|yeast|cornflour|icing)/.test(n))return 'baking';
+  if(/\b(cookies?|biscuits?|crisps?|crackers?|chocolate|sweets|snacks?|popcorn)/.test(n))return 'snacks';
   const pantry=locOf(i)==='pantry';
   switch(i.aisle||guessAisle(i.name)){
     case 'Meat & fish':return 'meat';
     case 'Dairy & eggs':return 'dairy';
     case 'Fruit & veg':return 'veg';
     case 'Bakery':return 'bread';
-    case 'Sauces & spices':return pantry?'spices':'sauces';
+    case 'Sauces & spices':return pantry&&/(cinnamon|nutmeg|cumin|turmeric|pepper|paprika|thyme|parsley|bay|oregano|basil|salt|seeds|chilli|cayenne|herb|spice|seasoning|powder|ginger|rosemary|sage|coriander|cardamom|clove)/.test(n)?'spices':'sauces';
     case 'Tins & dry goods':return pantry?'dry':'other';
     case 'Drinks':return 'supp';
   }
@@ -809,7 +841,7 @@ function syItems(){
 }
 function syApply(k,v){
   if(k==='settings')S.settings=mergeSettings(v);
-  else if(k==='fridge')S.fridge=Object.assign({items:[],from:null},v||{});
+  else if(k==='fridge'){S.fridge=Object.assign({items:[],from:null},v||{});S.fridge.items=fridgeDedupe(S.fridge.items||[]);}
   else if(k==='shop')S.shop=Object.assign({checked:{},extras:[],horizon:'all',shopped:{}},v||{});
   else{const m={r:S.recipes,s:S.shifts,p:S.plan}[k.charAt(0)];if(m)m[k.slice(2)]=v;}
 }
@@ -1619,7 +1651,7 @@ function openRules(){
         h+='<div class="set-lbl">Data</div>';
         h+='<button class="opt" data-act="backup-restore"><span class="ic">{ }</span><span><b>Import shifts</b><span>Paste the shifts JSON Claude gives you.</span></span></button>';
       }
-      h+='<div class="small muted" style="text-align:center;padding-top:4px">Version 27 Nov, 11:40</div>';
+      h+='<div class="small muted" style="text-align:center;padding-top:4px">Version 27 Nov, 15:10</div>';
       return h;
     },
     foot:function(){return '<button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="save-rules">Save</button>';}});
@@ -1873,16 +1905,16 @@ const ACT={
       toast(added+' days added'+(kept?', '+kept+' left as you had them':'')+'. Times filled from your presets where known.');return;
     }
     if(d&&d.kitchenTable===1&&d.fridgeOnly&&Array.isArray(d.fridge)){
-      const t=todayISO(),add=[];let dup=0;
+      const t=todayISO(),add=[];
       d.fridge.forEach(function(x){
         if(!x||!x.name)return;
-        if((S.fridge.items||[]).concat(add).some(function(f){return nameMatch(f.name,String(x.name))===2;})){dup++;return;}
         const q=x.q==null||x.q===''?null:Number(x.q);
         add.push(fridgeRec(String(x.name),isNaN(q)?null:q,x.u||'',x.aisle||null,t,(x.use===null?null:(x.use||undefined)),x.loc));
       });
-      S.fridge=Object.assign({},S.fridge,{items:(S.fridge.items||[]).concat(add),from:S.fridge.from||t});
+      const r=addFridgeItems(S.fridge.items||[],add,false);
+      S.fridge=Object.assign({},S.fridge,{items:r.items,from:S.fridge.from||t});
       persistLocal();document.querySelectorAll('.overlay').forEach(function(o){o.remove();});render(true);
-      toast(add.length+(add.length===1?' item':' items')+' added'+(dup?', '+dup+' already there':'')+'.');return;
+      toast(r.added+(r.added===1?' item':' items')+' added'+(r.skipped.length?', '+r.skipped.length+' already there':'')+'.');return;
     }
     toast('That isn’t shifts or recipes JSON.');
   },
@@ -1916,7 +1948,7 @@ const ACT={
     const c=ctxOf(el),t=todayISO(),add=[];
     String(c.text||'').split('\n').forEach(function(line){const p=parseIng(line);if(p)add.push(fridgeRec(p.n,p.q,p.u,p.aisle,t,undefined,S.ft));});
     if(!add.length){toast('Type at least one item.');return;}
-    closeSheet(el);saveFridge((S.fridge.items||[]).concat(add));toast(add.length+(add.length===1?' item':' items')+' added.');
+    const r=addFridgeItems(S.fridge.items||[],add,true);closeSheet(el);saveFridge(r.items);toast(r.added+(r.added===1?' item':' items')+' added'+(r.merged?', '+r.merged+' topped up':'')+(r.skipped.length?', '+r.skipped.length+' already there':'')+'.');
   },
   'fridge-tab':function(el){S.ft=el.dataset.v==='pantry'?'pantry':'fridge';render(true);},
   'fridge-edit':function(el){if(guardWrite())openFridgeEdit(el.dataset.id);},
@@ -1961,7 +1993,7 @@ const ACT={
       bought.push(fridgeRec(n,null,'',undefined,tdy,undefined,old?locOf(old):undefined));
     });
     shopDates().forEach(function(d){mealsOn(S,d).forEach(function(m){sp[m.key]=true;});});
-    if(bought.length){S.fridge=Object.assign({},S.fridge,{items:items.concat(bought),from:S.fridge.from||todayISO()});persistLocal();}
+    if(bought.length){S.fridge=Object.assign({},S.fridge,{items:addFridgeItems(items,bought,true).items,from:S.fridge.from||todayISO()});persistLocal();}
     saveShop({shopped:sp,checked:{},evBought:evb,extras:(S.shop.extras||[]).filter(function(e){return !e.done;})});
     toast(bought.length?'Done. '+bought.length+(bought.length===1?' item':' items')+' added to the fridge.':'Done. Those dinners are marked as shopped for.');
   },
@@ -2073,7 +2105,7 @@ async function init(){
   }catch(e){}
   if(DB){subscribe();}
   else{
-    STANDALONE=true;loadLocal();if(!S.fridge.from){S.fridge.from=todayISO();}applyBuiltins();if(!lsGet('kt-hz')){S.shop.horizon='all';lsSet('kt-hz','1');persistLocal();}syStart();
+    STANDALONE=true;loadLocal();if(!S.fridge.from){S.fridge.from=todayISO();}{const n0=(S.fridge.items||[]).length;S.fridge.items=fridgeDedupe(S.fridge.items||[]);if(S.fridge.items.length!==n0)persistLocal();}applyBuiltins();if(!lsGet('kt-hz')){S.shop.horizon='all';lsSet('kt-hz','1');persistLocal();}syStart();
     const k=lsGet('kt-key');
     if(k){SAMPLE=makeApiSample(k);try{SAMPLE_LIM=await SAMPLE.limits();}catch(e){}}
     if(lsGet('kt-probe')===null&&!lsSet('kt-probe','1'))S.noStore=true;
