@@ -549,12 +549,10 @@ function pickupPlan(S,today,nowMin){
   return out;
 }
 function pickupText(P,names){
-  const nm=function(i){return i.name+(i.q!=null?' ('+fmtQ(i.q,i.u)+')':'');};
-  const t=P.items.filter(function(i){return i.when==='tonight';}).map(nm),n=P.items.filter(function(i){return i.when==='tomorrow';}).map(nm);
-  let s='';
-  if(t.length)s+='Tonight: '+t.join(', ')+'. ';
-  if(n.length)s+='For tomorrow: '+n.join(', ')+'. ';
-  return s.trim();
+  const it=P.items||[];
+  if(!it.length)return '';
+  if(it.length===1){const i=it[0];return i.name+': '+(i.q!=null?fmtQ(i.q,i.u)+' needed':'needed');}
+  return it.length+' items needed';
 }
 function mealWeight(S,iso,slot){
   const st=S.settings||{},jf=Number(st.jFactor)>0?Number(st.jFactor):1.3,vf=Number(st.vFactor)>0?Number(st.vFactor):1;
@@ -1393,7 +1391,7 @@ function viewShop(){
     h+='<div class="empty"><h3>'+(sd?'Nothing more to buy':'Nothing to buy yet')+'</h3><p class="muted" style="margin:0">'+(sd?'Everything the planned dinners need is already at home. Plan more dinners and anything missing appears here.':'Choose dinners on the Plan tab and the ingredients land here, merged and sorted by aisle.')+'</p><button class="btn" data-act="tab" data-tab="plan">Go to the plan</button></div>';
   }
   {const P=pickupPlan(S,todayISO(),new Date().getHours()*60+new Date().getMinutes());
-    if(P.items.length&&P.who)h+='<div class="card pickup"><div class="label">On the way home</div><div class="pk"><b>'+(P.who==='viv'?'Viv':'Julian')+(P.store?' · '+esc(P.store):'')+'</b>'+(P.skip==='late'?'<small>Home too late for the shops, so no reminder today.</small>':'<small>Reminder at '+fmtMin(P.at)+'</small>')+'</div><div class="pkl">'+esc(pickupText(P))+'</div></div>';}
+    if(P.items.length&&P.who)h+='<div class="card pickup"><div class="label">On the way home</div><div class="pk"><b>'+(P.who==='viv'?'Viv':'Julian')+'</b>'+(P.skip==='late'?'<small>Home too late for the shops, so no reminder today.</small>':'<small>Reminder at '+fmtMin(P.at)+'</small>')+'</div><div class="pkl">'+esc(pickupText(P))+'</div></div>';}
   if(data.unsure&&data.unsure.length)h+='<div class="card unsure"><div class="label">Check these</div>'+data.unsure.map(function(u){return '<div class="us"><div class="ut"><b class="cap">'+esc(u.name)+'</b><small>Have '+esc(fmtQ(u.haveQ,u.haveU))+' · need '+esc(fmtQ(u.need,u.u)||'some')+'. Enough?</small></div><span class="ub"><button class="btn sm" data-act="unsure-yes" data-key="'+esc(u.key)+'">Yes</button><button class="btn ghost sm" data-act="unsure-no" data-key="'+esc(u.key)+'">Buy</button></span></div>';}).join('')+'</div>';
   const exBy={};
   ex.forEach(function(e){let a=guessAisle(e.name);if(AISLES.indexOf(a)<0)a='Other';(exBy[a]=exBy[a]||[]).push(e);});
@@ -1851,7 +1849,7 @@ function openRules(){
         h+='<div class="set-lbl">Data</div>';
         h+='<button class="opt" data-act="backup-restore"><span class="ic">{ }</span><span><b>Import shifts</b><span>Paste the shifts JSON Claude gives you.</span></span></button>';
       }
-      h+='<div class="small muted" style="text-align:center;padding-top:4px">Version 27 Nov, 18:36</div>';
+      h+='<div class="small muted" style="text-align:center;padding-top:4px">Version 27 Nov, 18:55</div>';
       return h;
     },
     foot:function(){return '<button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="save-rules">Save</button>';}});

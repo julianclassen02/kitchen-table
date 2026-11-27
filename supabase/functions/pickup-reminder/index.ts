@@ -46,7 +46,7 @@ function decide(L, rows, now, windowMin) {
   if (!P.items.length || !P.who || P.at == null || P.skip) return { send: false, why: P.skip ? "too late for the shops" : "nothing missing", P };
   if (now.min < P.at) return { send: false, why: "not yet (" + L.fmtMin(P.at) + ")", P };
   if (now.min >= P.at + windowMin) return { send: false, why: "window passed", P };
-  const body = (P.store ? P.store + ". " : "") + L.pickupText(P);
+  const body = L.pickupText(P);
   return { send: true, who: P.who, title: "Pick up on the way home", body: body, P };
 }
 // ===== CORE END =====
@@ -297,12 +297,10 @@ function pickupPlan(S,today,nowMin){
   return out;
 }
 function pickupText(P,names){
-  const nm=function(i){return i.name+(i.q!=null?' ('+fmtQ(i.q,i.u)+')':'');};
-  const t=P.items.filter(function(i){return i.when==='tonight';}).map(nm),n=P.items.filter(function(i){return i.when==='tomorrow';}).map(nm);
-  let s='';
-  if(t.length)s+='Tonight: '+t.join(', ')+'. ';
-  if(n.length)s+='For tomorrow: '+n.join(', ')+'. ';
-  return s.trim();
+  const it=P.items||[];
+  if(!it.length)return '';
+  if(it.length===1){const i=it[0];return i.name+': '+(i.q!=null?fmtQ(i.q,i.u)+' needed':'needed');}
+  return it.length+' items needed';
 }
 function mealWeight(S,iso,slot){
   const st=S.settings||{},jf=Number(st.jFactor)>0?Number(st.jFactor):1.3,vf=Number(st.vFactor)>0?Number(st.vFactor):1;
@@ -766,6 +764,13 @@ Deno.serve(async (req) => {
     for (const home of Object.keys(byHome)) {
       const mine = byHome[home];
       // Test button in the app: sends straight away to the person who pressed it.
+      if (url.searchParams.get("preview") === "1") {
+        const sent = await pushTo(mine, { title: "Pick up on the way home", body: "Capers: 4 tbsp needed", url: "./#shop", tag: "kt-prev1" });
+        await new Promise((r) => setTimeout(r, 4000));
+        const sent2 = await pushTo(mine, { title: "Pick up on the way home", body: "3 items needed", url: "./#shop", tag: "kt-prev2" });
+        out.households.push({ home: home, preview: true, sent: sent + sent2 });
+        continue;
+      }
       if (url.searchParams.get("test") === "1") {
         const who = url.searchParams.get("who");
         const sent = await pushTo(mine.filter((s) => !who || s.who === who), { title: "Kitchen Table", body: "Reminders are working.", url: "./#shop" });

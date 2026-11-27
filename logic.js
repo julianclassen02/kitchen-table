@@ -244,12 +244,10 @@ function pickupPlan(S,today,nowMin){
   return out;
 }
 function pickupText(P,names){
-  const nm=function(i){return i.name+(i.q!=null?' ('+fmtQ(i.q,i.u)+')':'');};
-  const t=P.items.filter(function(i){return i.when==='tonight';}).map(nm),n=P.items.filter(function(i){return i.when==='tomorrow';}).map(nm);
-  let s='';
-  if(t.length)s+='Tonight: '+t.join(', ')+'. ';
-  if(n.length)s+='For tomorrow: '+n.join(', ')+'. ';
-  return s.trim();
+  const it=P.items||[];
+  if(!it.length)return '';
+  if(it.length===1){const i=it[0];return i.name+': '+(i.q!=null?fmtQ(i.q,i.u)+' needed':'needed');}
+  return it.length+' items needed';
 }
 function mealWeight(S,iso,slot){
   const st=S.settings||{},jf=Number(st.jFactor)>0?Number(st.jFactor):1.3,vf=Number(st.vFactor)>0?Number(st.vFactor):1;
