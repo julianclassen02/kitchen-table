@@ -796,11 +796,12 @@ async function syRun(){
     Object.keys(remote).forEach(function(k){
       const r=remote[k],rh=syH(r.data),lh=(k in local)?syH(local[k]):null,b=SY.base[k];
       if(lh===rh){SY.base[k]={h:rh,t:r.updated_at};return;}
-      const localEdited=lh!==null&&b&&b.h!==lh;
+      const localEdited=lh!==null&&b&&b.h!==lh&&!(k==='fridge'&&S.fridgeLost);
       if(localEdited)return;
       if(lh===null&&b&&b.h===rh)return;
       syApply(k,r.data);SY.base[k]={h:rh,t:r.updated_at};changed=true;
     });
+    if(remote['fridge']&&S.fridgeLost){S.fridgeLost=false;lsSet('kt-fl','0');}
     Object.keys(SY.base).forEach(function(k){
       if(k in remote)return;
       const b=SY.base[k];
@@ -826,7 +827,7 @@ async function syRun(){
       part.forEach(function(k){delete SY.base[k];});
     }
     lsSet('kt-sync-base',JSON.stringify(SY.base));
-    if(changed){lsSet('kt-data',JSON.stringify({recipes:S.recipes,shifts:S.shifts,plan:S.plan,settings:S.settings,shop:S.shop}));SY.dirty=true;}
+    if(changed){lsSet('kt-data',JSON.stringify({recipes:S.recipes,shifts:S.shifts,plan:S.plan,settings:S.settings,shop:S.shop,fridge:S.fridge}));SY.dirty=true;}
     SY.status='ok';SY.last=Date.now();
   }catch(e){SY.status='error: '+(e&&e.message||e);}
   SY.busy=false;
@@ -866,6 +867,7 @@ function applyBuiltins(){
 }
 function persistLocal(){
   syKick();
+  if(S.fridgeLost&&(S.fridge.items||[]).length){S.fridgeLost=false;lsSet('kt-fl','0');}
   if(!lsSet('kt-data',JSON.stringify({recipes:S.recipes,shifts:S.shifts,plan:S.plan,settings:S.settings,shop:S.shop,fridge:S.fridge}))&&!S.noStore){S.noStore=true;}
 }
 function loadLocal(){
@@ -874,6 +876,7 @@ function loadLocal(){
     S.recipes=d.recipes||{};S.shifts=d.shifts||{};S.plan=d.plan||{};S.settings=mergeSettings(d.settings);
     S.shop=Object.assign({checked:{},extras:[],horizon:'all',shopped:{}},d.shop||{});
     S.fridge=Object.assign({items:[],from:null},d.fridge||{});
+    if(!d.fridge||lsGet('kt-fl')==='1'){S.fridgeLost=true;lsSet('kt-fl','1');}
   }catch(e){}
 }
 function parseLoose(t){
@@ -1571,7 +1574,7 @@ function openRules(){
         h+='<div class="set-lbl">Data</div>';
         h+='<button class="opt" data-act="backup-restore"><span class="ic">{ }</span><span><b>Import shifts</b><span>Paste the shifts JSON Claude gives you.</span></span></button>';
       }
-      h+='<div class="small muted" style="text-align:center;padding-top:4px">Version 27 Nov, 01:50</div>';
+      h+='<div class="small muted" style="text-align:center;padding-top:4px">Version 27 Nov, 02:10</div>';
       return h;
     },
     foot:function(){return '<button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="save-rules">Save</button>';}});
