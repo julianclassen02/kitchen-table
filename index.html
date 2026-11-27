@@ -106,6 +106,7 @@ h1,h2,h3{font-family:var(--font-display);margin:0;letter-spacing:-.01em;text-wra
 
 /* fridge + morning check */
 .mi.fi .qty{flex:none;font-weight:600;font-size:15px;color:var(--ink);background:var(--paper);border-radius:99px;padding:4px 11px}
+.mi small.mine{font-style:italic;opacity:.7}
 .mi.fi.warn small{color:var(--warn);font-weight:600}
 .swr{position:relative;overflow:hidden;border-radius:14px}
 .swr .mi{position:relative;background:var(--paper);transition:transform .22s ease;touch-action:pan-y;user-select:none;-webkit-user-select:none}
@@ -313,6 +314,7 @@ function hm(x){const n=((Math.round(x)%1440)+1440)%1440;return pad(Math.floor(n/
 const AISLES=['Fruit & veg','Meat & fish','Dairy & eggs','Bakery','Tins & dry goods','Frozen','Sauces & spices','Drinks','Household','Other'];
 const AISLE_WORDS=[
  ['Fruit & veg',['green bean','runner bean','bean sprout','sweet potato','spring onion','pak choi']],
+ ['Household',['toilet roll','toilet paper','kitchen roll','loo roll','washing up','dishwasher','bin bag','tissues','sponge','bleach','detergent','toothpaste','shampoo','soap']],
  ['Frozen',['frozen','ice cream']],
  ['Tins & dry goods',['tin','tinned','can','canned','pasta','rice','noodle','flour','sugar','lentil','chickpea','bean','oat','couscous','quinoa','stock','passata','coconut milk','puree','breadcrumb','cereal','polenta','spaghetti','penne','fusilli','tagliatelle','lasagne','gnocchi','bulgur','cornflour','tortilla chip','nut','almond','cashew','raisin','dried']],
  ['Sauces & spices',['black pepper','chilli flake','salt','cumin','paprika','turmeric','oregano','cinnamon','curry','garam','masala','soy','vinegar','oil','mustard','ketchup','mayo','mayonnaise','sauce','honey','syrup','stock cube','spice','seasoning','pesto','harissa','tahini','miso','sriracha','worcestershire','bay leaf','nutmeg','cayenne','paste']],
@@ -1241,11 +1243,14 @@ function viewShop(){
   if(!total&&!ex.length){
     h+='<div class="empty"><h3>'+(sd?'All shopped for':'Nothing to buy yet')+'</h3><p class="muted" style="margin:0">'+(sd?'Every planned dinner in this range is already covered. Plan more dinners and the new ingredients appear here.':'Choose dinners on the Plan tab and the ingredients land here, merged and sorted by aisle.')+'</p><button class="btn" data-act="tab" data-tab="plan">Go to the plan</button></div>';
   }
-  const exs=ex;
-  if(exs.length)h+=ddHtml('added','Added by you',exs.filter(function(e){return !e.done;}).length,exs.map(function(e){return '<button class="mi'+(e.done?' done':'')+'" data-act="tick-extra" data-id="'+esc(e.id)+'"><span class="ico">'+iconFor(e.name,'Other')+'</span><span class="nm"><span class="t"><span class="cap">'+esc(e.name)+'</span></span></span><span class="cb">✓</span></button>';}).join(''),true,'<button class="clr" data-act="clear-extras">Clear</button>');
-  data.aisles.forEach(function(a){
-    const items=a.items;
-    h+='<div class="mgroup"><h3>'+esc(a.aisle)+'</h3>'+items.map(function(i){return shopItemHtml(i,!!ck[i.key],a.aisle);}).join('')+'</div>';
+  const exBy={};
+  ex.forEach(function(e){let a=guessAisle(e.name);if(AISLES.indexOf(a)<0)a='Other';(exBy[a]=exBy[a]||[]).push(e);});
+  const exHtml=function(e){return '<button class="mi'+(e.done?' done':'')+'" data-act="tick-extra" data-id="'+esc(e.id)+'"><span class="ico">'+iconFor(e.name,'Other')+'</span><span class="nm"><span class="t"><span class="cap">'+esc(e.name)+'</span></span><small class="mine">Added by you</small></span><span class="cb">✓</span></button>';};
+  const byA={};data.aisles.forEach(function(a){byA[a.aisle]=a.items;});
+  AISLES.forEach(function(a){
+    const items=byA[a]||[],xs=exBy[a]||[];
+    if(!items.length&&!xs.length)return;
+    h+='<div class="mgroup"><h3>'+esc(a)+'</h3>'+items.map(function(i){return shopItemHtml(i,!!ck[i.key],a);}).join('')+xs.map(exHtml).join('')+'</div>';
   });
   if(total||ex.length||evn.some(function(n){return ck['ev:'+n.toLowerCase()];}))h+='<div class="row-actions"><button class="btn soft sm" data-act="shop-finish">Finish shop</button></div>';
   if(sd)h+='<div class="small muted">Already shopped for '+sd+' dinner'+(sd>1?'s':'')+'. <button class="btn ghost sm" data-act="shop-reset" style="margin-left:4px">Show them again</button></div>';
@@ -1690,7 +1695,7 @@ function openRules(){
         h+='<div class="set-lbl">Data</div>';
         h+='<button class="opt" data-act="backup-restore"><span class="ic">{ }</span><span><b>Import shifts</b><span>Paste the shifts JSON Claude gives you.</span></span></button>';
       }
-      h+='<div class="small muted" style="text-align:center;padding-top:4px">Version 27 Nov, 16:58</div>';
+      h+='<div class="small muted" style="text-align:center;padding-top:4px">Version 27 Nov, 17:12</div>';
       return h;
     },
     foot:function(){return '<button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="save-rules">Save</button>';}});
