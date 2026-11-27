@@ -106,6 +106,7 @@ h1,h2,h3{font-family:var(--font-display);margin:0;letter-spacing:-.01em;text-wra
 
 /* fridge + morning check */
 .mi.fi .qty{flex:none;font-weight:600;font-size:15px;color:var(--ink);background:var(--paper);border-radius:99px;padding:4px 11px}
+.mi small .est{color:var(--warn);font-weight:600}
 .mi small.mine{font-style:italic;opacity:.7}
 .mi.fi.warn small{color:var(--warn);font-weight:600}
 .swr{position:relative;overflow:hidden;border-radius:14px}
@@ -558,7 +559,9 @@ function buildShopping(S,dates){
       }
     }
     if(it.q!=null&&it.have&&(it.u==='g'||it.u==='ml')&&it.q<10)it.q=0;
-    if(it.q!=null){
+    const pk=it.q>0?packFor(it.name,it.u):null;
+    if(pk){it.need=it.q;it.pack=pk;it.q=Math.ceil(it.q/pk-1e-9)*pk;}
+    else if(it.q!=null){
       if(it.u==='g'||it.u==='ml')it.q=it.q>=50?Math.round(it.q/5)*5:Math.round(it.q);
       else if(!it.u||PLURAL_U[it.u])it.q=Math.ceil(it.q-1e-9);
       else it.q=Math.ceil(it.q*2-1e-9)/2;
@@ -706,7 +709,7 @@ function addFridgeItems(items,recs,sum){
     const i=out.findIndex(function(f){return nameMatch(f.name,r.name)===2;});
     if(i<0){out.push(r);res.added++;return;}
     const f=out[i];
-    if(sum&&f.q!=null&&r.q!=null&&uk(f.u)===uk(r.u)){out[i]=Object.assign({},f,{q:Math.round((f.q+r.q)*100)/100,added:r.added,use:r.use||f.use});res.merged++;}
+    if(sum&&f.q!=null&&r.q!=null&&uk(f.u)===uk(r.u)){out[i]=Object.assign({},f,{q:Math.round((f.q+r.q)*100)/100,added:r.added,use:r.use||f.use,est:!!(f.est||r.est)});res.merged++;}
     else if(sum&&(f.q==null||r.q==null)){out[i]=Object.assign({},f,{added:r.added,use:r.use||f.use});res.merged++;}
     else res.skipped.push(r.name);
   });
@@ -738,9 +741,41 @@ function fridgeDedupe(items){
   });
   return out;
 }
-function fridgeRec(name,q,u,aisle,today,use,loc){
+// Standard shop pack sizes: [name pattern, size, unit]. Shopping rounds UP to whole packs; stock is consumed by recipe amounts.
+const PACKS=[
+  [/\b(parmesan|pecorino|grana padano)\b/,150,'g'],[/\b(soft cheese|cream cheese|philadelphia)\b/,250,'g'],[/\bcottage cheese\b/,300,'g'],
+  [/\bcheddar\b/,200,'g'],[/\bfeta\b/,200,'g'],[/\bhalloumi\b/,225,'g'],[/\bmozzarella\b/,125,'g'],[/\bmascarpone\b/,250,'g'],[/\bricotta\b/,250,'g'],
+  [/\bbutter\b/,250,'g'],[/\b(double |single )?cream\b/,300,'ml'],[/\bcreme fraiche\b/,300,'g'],[/\b(greek )?yoghurt\b/,500,'g'],
+  [/\b(beef )?mince\b/,500,'g'],[/\bchicken (breast|thigh)s?\b/,600,'g'],[/\b(bacon|lardons|pancetta)\b/,200,'g'],[/\bprawns?\b/,200,'g'],[/\bchorizo\b/,225,'g'],
+  [/\b(salmon|cod|haddock|seabass|sea bass) fillets?\b/,2,''],[/\bsteaks?\b/,2,''],[/\bsausages?\b/,6,''],
+  [/\bspinach\b/,200,'g'],[/\bmushrooms?\b/,250,'g'],[/\bcherry tomatoes\b/,250,'g'],[/\bkale\b/,200,'g'],
+  [/\b(spaghetti|linguine|penne|fusilli|tagliatelle|rigatoni|pasta|orzo|couscous|lentils?)\b/,500,'g'],
+  [/\b(basmati|jasmine|long grain)?\s*rice\b/,1000,'g'],[/\bnoodles\b/,300,'g'],[/\bflour\b/,1500,'g'],[/\bsugar\b/,1000,'g'],[/\boats\b/,1000,'g']
+];
+function packFor(name,u){
+  const n=String(name||'').toLowerCase(),uu=uk(u);
+  for(const p of PACKS){if(p[0].test(n))return p[2]===uu?p[1]:null;}
+  return null;
+}
+// Educated guess when an item has no amount: one standard pack if we know it, else one can / jar / pack.
+function guessAmount(name,aisle){
+  const n=String(name||'').toLowerCase();
+  for(const p of PACKS){if(p[0].test(n))return {q:p[1],u:p[2]};}
+  if(/\b(tinned|canned|chopped tomatoes|plum tomatoes|baked beans|chickpeas|kidney beans|coconut milk|sweetcorn)\b/.test(n))return {q:1,u:'can'};
+  if(/\b(sauce|pesto|chutney|jam|pickle|paste|curry|dressing|mayo|mayonnaise|ketchup|mustard)\b/.test(n))return {q:1,u:'jar'};
+  return {q:1,u:'pack'};
+}
+function fridgeFill(S){
+  let n=0;
+  (S.fridge.items||[]).forEach(function(i){
+    if(i.q==null&&!isEveryday(S,i.name)){const g=guessAmount(i.name,i.aisle);i.q=g.q;i.u=g.u;i.est=true;n++;}
+  });
+  return n;
+}
+function fridgeRec(name,q,u,aisle,today,use,loc,exempt){
   const a=aisle||(u==='tin'||u==='can'?'Tins & dry goods':guessAisle(name));
   const r={id:uid('f'),name:name,q:q==null?null:q,u:u||'',aisle:a,added:today,use:use!==undefined?use:useByGuess(name,a,today)};
+  if(r.q==null&&!exempt){const g=guessAmount(name,a);r.q=g.q;r.u=g.u;r.est=true;}
   r.loc=loc==='fridge'||loc==='pantry'?loc:locOf(r);
   return r;
 }
@@ -871,7 +906,7 @@ function syItems(){
 }
 function syApply(k,v){
   if(k==='settings')S.settings=mergeSettings(v);
-  else if(k==='fridge'){S.fridge=Object.assign({items:[],from:null},v||{});S.fridge.items=fridgeDedupe(S.fridge.items||[]);}
+  else if(k==='fridge'){S.fridge=Object.assign({items:[],from:null},v||{});S.fridge.items=fridgeDedupe(S.fridge.items||[]);fridgeFill(S);}
   else if(k==='shop')S.shop=Object.assign({checked:{},extras:[],horizon:'all',shopped:{}},v||{});
   else{const m={r:S.recipes,s:S.shifts,p:S.plan}[k.charAt(0)];if(m)m[k.slice(2)]=v;}
 }
@@ -1214,7 +1249,7 @@ function iconFor(name){
   return '🛒';
 }
 function shopItemHtml(it,done,aisle){
-  const q=fmtQ(it.q,it.u),sub=it.from&&it.from.length?'<small>'+esc(it.from.join(', '))+'</small>':'';
+  const q=fmtQ(it.q,it.u),pn=it.pack&&it.need&&it.q>it.need+1e-9?' · need '+fmtQ(Math.round(it.need*100)/100,it.u):'',sub=it.from&&it.from.length?'<small>'+esc(it.from.join(', '))+esc(pn)+'</small>':'';
   return '<button class="mi'+(done?' done':'')+'" data-act="tick" data-key="'+esc(it.key)+'"><span class="ico">'+iconFor(it.name,aisle)+'</span><span class="nm"><span class="t">'+(q?'<b>'+esc(q)+'</b> ':'')+'<span class="cap">'+esc(it.name)+'</span></span>'+sub+'</span><span class="cb">✓</span></button>';
 }
 function ddHtml(key,title,n,inner,defOpen,extra){
@@ -1262,7 +1297,7 @@ function viewShop(){
 function fridgeRow(i,today,over){
   const q=i.q!=null?fmtQ(i.q,i.u):'',lbl=over||useLabel(i.use,today);
   const warn=i.use&&i.use<=addDays(today,1)&&!LONGLIFE[i.aisle];
-  return '<div class="swr"><button class="swdel" data-act="fridge-swipe-del" data-id="'+esc(i.id)+'" tabindex="-1" aria-label="Delete '+esc(i.name)+'">Delete</button><button class="mi fi'+(warn?' warn':'')+'" data-act="fridge-edit" data-id="'+esc(i.id)+'"><span class="ico">'+iconFor(i.name,i.aisle)+'</span><span class="nm"><span class="t"><span class="cap">'+esc(i.name)+'</span></span>'+(lbl?'<small>'+esc(lbl)+'</small>':'')+'</span>'+(q?'<span class="qty">'+esc(q)+'</span>':'')+'</button></div>';
+  return '<div class="swr"><button class="swdel" data-act="fridge-swipe-del" data-id="'+esc(i.id)+'" tabindex="-1" aria-label="Delete '+esc(i.name)+'">Delete</button><button class="mi fi'+(warn?' warn':'')+'" data-act="fridge-edit" data-id="'+esc(i.id)+'"><span class="ico">'+iconFor(i.name,i.aisle)+'</span><span class="nm"><span class="t"><span class="cap">'+esc(i.name)+'</span></span>'+((lbl||i.est)?'<small>'+esc(lbl||'')+(i.est?(lbl?' · ':'')+'<span class="est">⚠ Amount guessed, tap to confirm</span>':'')+'</small>':'')+'</span>'+(q?'<span class="qty">'+esc(q)+'</span>':'')+'</button></div>';
 }
 function viewFridge(){
   const items=S.fridge.items||[],pend=pendingMeals(S,mcToday());
@@ -1301,7 +1336,7 @@ function saveFridge(items,extra){
 }
 function openFridgeAdd(){
   openSheet({title:'Add to the '+(S.ft==='pantry'?'pantry':'fridge'),ctx:{text:''},
-    body:function(c){return '<div class="field"><label for="fa">One item per line, with an amount if you know it</label><textarea id="fa" data-bind="text" style="min-height:190px" placeholder="500 g chicken thighs&#10;2 onions&#10;1 pack spinach&#10;milk">'+esc(c.text||'')+'</textarea></div><div class="small muted">Use-by dates are guessed from the food type. Tap any item afterwards to change it.</div>';},
+    body:function(c){return '<div class="field"><label for="fa">One item per line, with an amount (if you leave it out, we guess one pack)</label><textarea id="fa" data-bind="text" style="min-height:190px" placeholder="500 g chicken thighs&#10;2 onions&#10;1 pack spinach&#10;milk">'+esc(c.text||'')+'</textarea></div><div class="small muted">Use-by dates are guessed from the food type. Tap any item afterwards to change it.</div>';},
     foot:function(){return '<button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="fridge-add-go">Add</button>';}});
 }
 function openFridgeEdit(id){
@@ -1698,7 +1733,7 @@ function openRules(){
         h+='<div class="set-lbl">Data</div>';
         h+='<button class="opt" data-act="backup-restore"><span class="ic">{ }</span><span><b>Import shifts</b><span>Paste the shifts JSON Claude gives you.</span></span></button>';
       }
-      h+='<div class="small muted" style="text-align:center;padding-top:4px">Version 27 Nov, 17:21</div>';
+      h+='<div class="small muted" style="text-align:center;padding-top:4px">Version 27 Nov, 17:42</div>';
       return h;
     },
     foot:function(){return '<button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="save-rules">Save</button>';}});
@@ -2012,7 +2047,8 @@ const ACT={
     const c=ctxOf(el),d=c.d,name=String(d.name||'').trim();
     if(!name){toast('Give it a name.');return;}
     const q=d.q===''||d.q==null?null:Number(d.q);
-    saveFridge((S.fridge.items||[]).map(function(i){return i.id===c.id?Object.assign({},i,{name:name,q:isNaN(q)?null:q,u:d.u||'',use:d.use||null,loc:d.loc==='pantry'?'pantry':'fridge'}):i;}));
+    if(q==null||isNaN(q)||!(q>0)){toast('Add an amount.');return;}
+    saveFridge((S.fridge.items||[]).map(function(i){return i.id===c.id?Object.assign({},i,{name:name,q:q,u:d.u||'',use:d.use||null,loc:d.loc==='pantry'?'pantry':'fridge',est:false}):i;}));
     closeSheet(el);
   },
   'fridge-swipe-del':function(el){
@@ -2046,7 +2082,7 @@ const ACT={
       evb[n.toLowerCase()]=tdy;
       const old=items.filter(function(f){return nameMatch(f.name,n)>0;})[0];
       items=items.filter(function(f){return nameMatch(f.name,n)===0;});
-      bought.push(fridgeRec(n,null,'',undefined,tdy,undefined,old?locOf(old):undefined));
+      bought.push(fridgeRec(n,null,'',undefined,tdy,undefined,old?locOf(old):undefined,true));
     });
     shopDates().forEach(function(d){mealsOn(S,d).forEach(function(m){sp[m.key]=true;});});
     if(bought.length){S.fridge=Object.assign({},S.fridge,{items:addFridgeItems(items,bought,true).items,from:S.fridge.from||todayISO()});persistLocal();}
@@ -2162,7 +2198,7 @@ async function init(){
   }catch(e){}
   if(DB){subscribe();}
   else{
-    STANDALONE=true;loadLocal();if(!S.fridge.from){S.fridge.from=todayISO();}{const n0=(S.fridge.items||[]).length;S.fridge.items=fridgeDedupe(S.fridge.items||[]);if(S.fridge.items.length!==n0)persistLocal();}applyBuiltins();if(!lsGet('kt-hz')){S.shop.horizon='all';lsSet('kt-hz','1');persistLocal();}syStart();
+    STANDALONE=true;loadLocal();if(!S.fridge.from){S.fridge.from=todayISO();}{const n0=(S.fridge.items||[]).length;S.fridge.items=fridgeDedupe(S.fridge.items||[]);const nf=fridgeFill(S);if(S.fridge.items.length!==n0||nf)persistLocal();}applyBuiltins();if(!lsGet('kt-hz')){S.shop.horizon='all';lsSet('kt-hz','1');persistLocal();}syStart();
     const k=lsGet('kt-key');
     if(k){SAMPLE=makeApiSample(k);try{SAMPLE_LIM=await SAMPLE.limits();}catch(e){}}
     if(lsGet('kt-probe')===null&&!lsSet('kt-probe','1'))S.noStore=true;
