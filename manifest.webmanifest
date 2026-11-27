@@ -1,6 +1,6 @@
 {
   "name": "Kitchen Table",
-  "short_name": "Kitchen",
+  "short_name": "Kitchen Table",
   "description": "Recipes, dinner planning around shifts, and a shopping list.",
   "start_url": "./",
   "scope": "./",
