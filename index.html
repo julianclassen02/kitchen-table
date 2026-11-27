@@ -107,6 +107,11 @@ h1,h2,h3{font-family:var(--font-display);margin:0;letter-spacing:-.01em;text-wra
 /* fridge + morning check */
 .mi.fi .qty{flex:none;font-weight:600;font-size:15px;color:var(--ink);background:var(--paper);border-radius:99px;padding:4px 11px}
 .mi.fi.warn small{color:var(--warn);font-weight:600}
+.swr{position:relative;overflow:hidden;border-radius:14px}
+.swr .mi{position:relative;background:var(--paper);transition:transform .22s ease;touch-action:pan-y;user-select:none;-webkit-user-select:none}
+.swr.drag .mi{transition:none}
+.swr.open .mi{transform:translateX(-96px)}
+.swdel{position:absolute;right:0;top:4px;bottom:4px;width:88px;border:0;border-radius:14px;background:var(--bad);color:#fff;font:600 15px var(--font-body)}
 .mgroup.soon h3{color:var(--warn)}
 button.mcb{width:100%;text-align:left;border:0;display:flex;flex-direction:column;gap:2px;font-family:inherit}
 button.mcb span{font-size:13px;opacity:.85}
@@ -1097,7 +1102,7 @@ function viewRecipes(){
 
 // Only exact matches get a picture; '' entries block a looser match below and fall back to the cart.
 const ICONS=[
-['stock',''],['stock cube',''],['bouillon',''],['paste',''],['puree',''],['sauce',''],['oil',''],['vinegar',''],['peanut butter',''],['coconut milk',''],['coconut oil',''],['oat milk',''],['almond milk',''],['soy milk',''],['lemon juice',''],['garlic bread',''],['egg noodle',''],['breadcrumb',''],['black pepper',''],['ice cream','🍦'],['rice noodle','🍜'],
+['soup',''],['ketchup',''],['sundried',''],['sun-dried',''],['weetabix',''],['whey',''],['protein',''],['chipolata',''],['sausage',''],['stock',''],['stock cube',''],['bouillon',''],['paste',''],['puree',''],['sauce',''],['oil',''],['vinegar',''],['peanut butter',''],['coconut milk',''],['coconut oil',''],['oat milk',''],['almond milk',''],['soy milk',''],['lemon juice',''],['garlic bread',''],['egg noodle',''],['breadcrumb',''],['black pepper',''],['ice cream','🍦'],['rice noodle','🍜'],
 ['toilet roll','🧻'],['toilet paper','🧻'],['loo roll','🧻'],['kitchen roll','🧻'],['kitchen towel','🧻'],['soap','🧼'],['hand wash','🧼'],['sponge','🧽'],['shampoo','🧴'],['conditioner','🧴'],['lotion','🧴'],['sun cream','🧴'],['toothbrush','🪥'],['razor','🪒'],['plaster','🩹'],['painkiller','💊'],['paracetamol','💊'],['ibuprofen','💊'],['vitamin','💊'],['battery','🔋'],['batteries','🔋'],['light bulb','💡'],['candle','🕯️'],['flower','💐'],
 ['coffee','☕'],['tea','🫖'],['beer','🍺'],['lager','🍺'],['prosecco','🥂'],['champagne','🥂'],['juice','🧃'],['cola','🥤'],['chocolate','🍫'],['biscuit','🍪'],['cookie','🍪'],['cake','🍰'],['popcorn','🍿'],['honey','🍯'],['peanut','🥜'],['nuts','🥜'],['coconut','🥥'],
 ['sweet potato','🍠'],['onion','🧅'],['garlic','🧄'],['carrot','🥕'],['potato','🥔'],['tomato','🍅'],['lemon','🍋'],['parsley','🌿'],['mint','🌿'],['thyme','🌿'],['basil','🌿'],['coriander','🌿'],['rosemary','🌿'],['aubergine','🍆'],['lettuce','🥬'],['spinach','🥬'],['cucumber','🥒'],['pepper','🫑'],['chilli','🌶️'],['mushroom','🍄'],['avocado','🥑'],['apple','🍎'],['banana','🍌'],['peas','🫛'],['green beans','🫛'],['beans','🫘'],
@@ -1150,7 +1155,7 @@ function viewShop(){
 function fridgeRow(i,today){
   const q=i.q!=null?fmtQ(i.q,i.u):'',lbl=useLabel(i.use,today);
   const warn=i.use&&i.use<=addDays(today,1)&&!LONGLIFE[i.aisle];
-  return '<button class="mi fi'+(warn?' warn':'')+'" data-act="fridge-edit" data-id="'+esc(i.id)+'"><span class="ico">'+iconFor(i.name,i.aisle)+'</span><span class="nm"><span class="t"><span class="cap">'+esc(i.name)+'</span></span>'+(lbl?'<small>'+esc(lbl)+'</small>':'')+'</span>'+(q?'<span class="qty">'+esc(q)+'</span>':'')+'</button>';
+  return '<div class="swr"><button class="swdel" data-act="fridge-swipe-del" data-id="'+esc(i.id)+'" tabindex="-1" aria-label="Delete '+esc(i.name)+'">Delete</button><button class="mi fi'+(warn?' warn':'')+'" data-act="fridge-edit" data-id="'+esc(i.id)+'"><span class="ico">'+iconFor(i.name,i.aisle)+'</span><span class="nm"><span class="t"><span class="cap">'+esc(i.name)+'</span></span>'+(lbl?'<small>'+esc(lbl)+'</small>':'')+'</span>'+(q?'<span class="qty">'+esc(q)+'</span>':'')+'</button></div>';
 }
 function viewFridge(){
   const today=todayISO(),items=S.fridge.items||[],pend=pendingMeals(S,mcToday());
@@ -1574,7 +1579,7 @@ function openRules(){
         h+='<div class="set-lbl">Data</div>';
         h+='<button class="opt" data-act="backup-restore"><span class="ic">{ }</span><span><b>Import shifts</b><span>Paste the shifts JSON Claude gives you.</span></span></button>';
       }
-      h+='<div class="small muted" style="text-align:center;padding-top:4px">Version 27 Nov, 02:10</div>';
+      h+='<div class="small muted" style="text-align:center;padding-top:4px">Version 27 Nov, 10:20</div>';
       return h;
     },
     foot:function(){return '<button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="save-rules">Save</button>';}});
@@ -1881,6 +1886,11 @@ const ACT={
     saveFridge((S.fridge.items||[]).map(function(i){return i.id===c.id?Object.assign({},i,{name:name,q:isNaN(q)?null:q,u:d.u||'',use:d.use||null,loc:d.loc==='pantry'?'pantry':'fridge'}):i;}));
     closeSheet(el);
   },
+  'fridge-swipe-del':function(el){
+    const id=el.dataset.id,it=(S.fridge.items||[]).filter(function(i){return i.id===id;})[0];
+    saveFridge((S.fridge.items||[]).filter(function(i){return i.id!==id;}));
+    if(it)toast('Removed '+it.name+'.');
+  },
   'fridge-del':function(el){const c=ctxOf(el);saveFridge((S.fridge.items||[]).filter(function(i){return i.id!==c.id;}));closeSheet(el);},
   'mc-open':function(){if(guardWrite())openMorning();},
   'mc-star':function(el){const c=ctxOf(el),n=Number(el.dataset.n);c.r=c.r===n?0:n;c.render();},
@@ -1921,6 +1931,53 @@ const ACT={
     try{navigator.clipboard.writeText(t).then(function(){toast('List copied');},fallback);}catch(e){fallback();}
   }
 };
+(function(){
+  const W=96;let g=null,sup=0,wx=0,wt=null;
+  function closeAll(except){document.querySelectorAll('.swr.open').forEach(function(r){if(r!==except)r.classList.remove('open');});}
+  document.addEventListener('pointerdown',function(e){
+    if(e.target.closest&&e.target.closest('.swdel'))return;
+    const r=e.target.closest?e.target.closest('.swr'):null;
+    if(!r){closeAll();return;}
+    closeAll(r);
+    g={r:r,row:r.querySelector('.mi'),x:e.clientX,y:e.clientY,base:r.classList.contains('open')?-W:0,lock:null,v:null};
+  });
+  document.addEventListener('pointermove',function(e){
+    if(!g)return;
+    const dx=e.clientX-g.x,dy=e.clientY-g.y;
+    if(g.lock===null){
+      if(Math.abs(dx)<8&&Math.abs(dy)<8)return;
+      if(Math.abs(dx)>Math.abs(dy)){g.lock='x';g.r.classList.add('drag');try{g.row.setPointerCapture(e.pointerId);}catch(x){}}
+      else{g=null;return;}
+    }
+    g.v=Math.max(-W-24,Math.min(0,g.base+dx));
+    g.row.style.transform='translateX('+g.v+'px)';
+  });
+  function end(){
+    if(!g)return;
+    if(g.lock==='x'){
+      g.r.classList.remove('drag');g.row.style.transform='';
+      g.r.classList.toggle('open',g.v!==null&&g.v<-W/2);
+      sup=Date.now();
+    }
+    g=null;
+  }
+  document.addEventListener('pointerup',end);
+  document.addEventListener('pointercancel',end);
+  document.addEventListener('click',function(e){
+    const r=e.target.closest?e.target.closest('.swr'):null;
+    if(!r||e.target.closest('.swdel'))return;
+    if(Date.now()-sup<350){e.stopPropagation();e.preventDefault();return;}
+    if(r.classList.contains('open')){r.classList.remove('open');e.stopPropagation();e.preventDefault();}
+  },true);
+  document.addEventListener('wheel',function(e){
+    const r=e.target.closest?e.target.closest('.swr'):null;
+    if(!r||Math.abs(e.deltaX)<=Math.abs(e.deltaY))return;
+    e.preventDefault();
+    wx+=e.deltaX;clearTimeout(wt);wt=setTimeout(function(){wx=0;},250);
+    if(wx>50){closeAll(r);r.classList.add('open');wx=0;}
+    else if(wx<-50){r.classList.remove('open');wx=0;}
+  },{passive:false});
+})();
 document.addEventListener('click',function(e){
   if(e.target.classList&&e.target.classList.contains('overlay')){e.target.remove();return;}
   const el=e.target.closest('[data-act]');if(!el)return;
