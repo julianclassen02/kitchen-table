@@ -752,7 +752,9 @@ async function pushTo(subs, payload) {
   return ok;
 }
 
+const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info", "Access-Control-Allow-Methods": "GET, POST, OPTIONS" };
 Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   const url = new URL(req.url);
   const now = londonNow(new Date());
   const out = { now: now, households: [] };
@@ -788,7 +790,7 @@ Deno.serve(async (req) => {
     }
   } catch (e) {
     out.error = String(e && e.message || e);
-    return new Response(JSON.stringify(out), { status: 500, headers: { "Content-Type": "application/json" } });
+    return new Response(JSON.stringify(out), { status: 500, headers: Object.assign({ "Content-Type": "application/json" }, CORS) });
   }
-  return new Response(JSON.stringify(out), { headers: { "Content-Type": "application/json" } });
+  return new Response(JSON.stringify(out), { headers: Object.assign({ "Content-Type": "application/json" }, CORS) });
 });
