@@ -106,7 +106,8 @@ h1,h2,h3{font-family:var(--font-display);margin:0;letter-spacing:-.01em;text-wra
 
 /* fridge + morning check */
 .mi.fi .qty{flex:none;font-weight:600;font-size:15px;color:var(--ink);background:var(--paper);border-radius:99px;padding:4px 11px}
-.unsure .us{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0}
+.unsure{padding:10px 14px}
+.unsure .us{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 0}
 .unsure .us+.us{border-top:1px dashed var(--line,#dfe5e1)}
 .unsure .ut small{display:block;color:var(--muted,#6b7a72);font-size:13px}
 .unsure .ub{display:flex;gap:6px;flex:none}
@@ -244,6 +245,8 @@ details.card summary{cursor:pointer;font-weight:600}
 .field input,.field select,.field textarea,.inp{width:100%;border:1px solid var(--line);background:var(--card);border-radius:12px;padding:11px 12px;font-size:16px}
 .field textarea{min-height:130px;resize:vertical;line-height:1.5}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.two>*{min-width:0}
+.two input,.two select{width:100%;box-sizing:border-box}
 .three{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
 .sw{display:flex;align-items:center;gap:10px;font-size:15px}
 .sw input{width:26px;height:26px;accent-color:var(--accent)}
@@ -564,7 +567,7 @@ function buildShopping(S,dates){
     if(it.q!=null&&!stp){
       const orig=it.q,dd=drawDown(pool,it.name,it.u,it.q,eq),rem=dd.rem,maybe=dd.maybe;
       if(rem>1e-9&&maybe&&sure[it.key]!=='no'){
-        unsure.push({key:it.key,name:it.name,need:Math.round(rem*100)/100,u:it.u,haveQ:maybe.q,haveU:maybe.u,haveName:maybe.name});
+        unsure.push({key:it.key,name:it.name,need:roundNeed(rem,it.u),u:it.u,haveQ:maybe.q,haveU:maybe.u,haveName:maybe.name});
         return;
       }
       if(rem<orig-1e-9){it.have=(it.have||0)+(orig-rem);it.q=rem;if(rem<orig*0.05)it.q=0;}
@@ -573,9 +576,7 @@ function buildShopping(S,dates){
     const pk=it.q>0?packFor(it.name,it.u):null;
     if(pk){it.need=it.q;it.pack=pk;it.q=Math.ceil(it.q/pk-1e-9)*pk;}
     else if(it.q!=null){
-      if(it.u==='g'||it.u==='ml')it.q=it.q>=50?Math.round(it.q/5)*5:Math.round(it.q);
-      else if(!it.u||PLURAL_U[it.u])it.q=Math.ceil(it.q-1e-9);
-      else it.q=Math.ceil(it.q*2-1e-9)/2;
+      it.q=roundNeed(it.q,it.u);
     }
     if(isStaple(it.name,S.settings.staples)){staples.push(it);return;}
     if(it.q!=null&&it.have&&!(it.q>0))return;
@@ -784,6 +785,11 @@ const PACKS=[
   [/\b(spaghetti|linguine|penne|fusilli|tagliatelle|rigatoni|pasta|orzo|couscous|lentils?)\b/,500,'g'],
   [/\b(basmati|jasmine|long grain)?\s*rice\b/,1000,'g'],[/\bnoodles\b/,300,'g'],[/\bflour\b/,1500,'g'],[/\bsugar\b/,1000,'g'],[/\boats\b/,1000,'g']
 ];
+function roundNeed(q,u){
+  if(u==='g'||u==='ml')return q>=50?Math.round(q/5)*5:Math.round(q);
+  if(!u||PLURAL_U[u])return Math.ceil(q-1e-9);
+  return Math.ceil(q*2-1e-9)/2;
+}
 function packFor(name,u){
   const n=String(name||'').toLowerCase(),uu=uk(u);
   for(const p of PACKS){if(p[0].test(n))return p[2]===uu?p[1]:null;}
@@ -795,12 +801,16 @@ function guessAmount(name,aisle){
   for(const p of PACKS){if(p[0].test(n))return {q:p[1],u:p[2]};}
   if(/\b(tinned|canned|chopped tomatoes|plum tomatoes|baked beans|chickpeas|kidney beans|coconut milk|sweetcorn)\b/.test(n))return {q:1,u:'can'};
   if(/\b(sauce|pesto|chutney|jam|pickle|paste|curry|dressing|mayo|mayonnaise|ketchup|mustard)\b/.test(n))return {q:1,u:'jar'};
+  for(const t of UNITG){if(t[0].test(n)&&t[1]['']!=null){
+    if(/\bgarlic\b/.test(n))return {q:1,u:''};
+    return {q:Math.max(1,Math.min(/\begg/.test(n)?6:4,Math.round(450/t[1][''])),),u:''};}}
   return {q:1,u:'pack'};
 }
 function fridgeFill(S){
   let n=0;
   (S.fridge.items||[]).forEach(function(i){
     if(i.q==null&&!isEveryday(S,i.name)){const g=guessAmount(i.name,i.aisle);i.q=g.q;i.u=g.u;i.est=true;n++;}
+    else if(i.est&&i.u==='pack'&&i.q===1){const g=guessAmount(i.name,i.aisle);if(g.u!=='pack'){i.q=g.q;i.u=g.u;n++;}} // upgrade an earlier lazy guess
   });
   return n;
 }
@@ -1300,7 +1310,7 @@ function iconFor(name){
   return '🛒';
 }
 function shopItemHtml(it,done,aisle){
-  const q=fmtQ(it.q,it.u),pn=it.pack&&it.need&&it.q>it.need+1e-9?' · need '+fmtQ(Math.round(it.need*100)/100,it.u):'',sub=it.from&&it.from.length?'<small>'+esc(it.from.join(', '))+esc(pn)+'</small>':'';
+  const q=fmtQ(it.q,it.u),pn=it.pack&&it.need&&it.q>it.need+1e-9?' · need '+fmtQ(roundNeed(it.need,it.u),it.u):'',sub=it.from&&it.from.length?'<small>'+esc(it.from.join(', '))+esc(pn)+'</small>':'';
   return '<button class="mi'+(done?' done':'')+'" data-act="tick" data-key="'+esc(it.key)+'"><span class="ico">'+iconFor(it.name,aisle)+'</span><span class="nm"><span class="t">'+(q?'<b>'+esc(q)+'</b> ':'')+'<span class="cap">'+esc(it.name)+'</span></span>'+sub+'</span><span class="cb">✓</span></button>';
 }
 function ddHtml(key,title,n,inner,defOpen,extra){
@@ -1332,7 +1342,7 @@ function viewShop(){
   if(!total&&!ex.length){
     h+='<div class="empty"><h3>'+(sd?'Nothing more to buy':'Nothing to buy yet')+'</h3><p class="muted" style="margin:0">'+(sd?'Everything the planned dinners need is already at home. Plan more dinners and anything missing appears here.':'Choose dinners on the Plan tab and the ingredients land here, merged and sorted by aisle.')+'</p><button class="btn" data-act="tab" data-tab="plan">Go to the plan</button></div>';
   }
-  if(data.unsure&&data.unsure.length)h+='<div class="card unsure"><div class="label">Check these</div>'+data.unsure.map(function(u){return '<div class="us"><div class="ut"><b>'+esc(u.name)+'</b><small>You have '+esc(fmtQ(u.haveQ,u.haveU))+'. The plan needs '+esc(fmtQ(u.need,u.u)||'some')+'. Enough?</small></div><span class="ub"><button class="btn sm" data-act="unsure-yes" data-key="'+esc(u.key)+'">Yes</button><button class="btn ghost sm" data-act="unsure-no" data-key="'+esc(u.key)+'">No, buy</button></span></div>';}).join('')+'</div>';
+  if(data.unsure&&data.unsure.length)h+='<div class="card unsure"><div class="label">Check these</div>'+data.unsure.map(function(u){return '<div class="us"><div class="ut"><b class="cap">'+esc(u.name)+'</b><small>Have '+esc(fmtQ(u.haveQ,u.haveU))+' · need '+esc(fmtQ(u.need,u.u)||'some')+'. Enough?</small></div><span class="ub"><button class="btn sm" data-act="unsure-yes" data-key="'+esc(u.key)+'">Yes</button><button class="btn ghost sm" data-act="unsure-no" data-key="'+esc(u.key)+'">Buy</button></span></div>';}).join('')+'</div>';
   const exBy={};
   ex.forEach(function(e){let a=guessAisle(e.name);if(AISLES.indexOf(a)<0)a='Other';(exBy[a]=exBy[a]||[]).push(e);});
   const exHtml=function(e){return '<button class="mi'+(e.done?' done':'')+'" data-act="tick-extra" data-id="'+esc(e.id)+'"><span class="ico">'+iconFor(e.name,'Other')+'</span><span class="nm"><span class="t"><span class="cap">'+esc(e.name)+'</span></span><small class="mine">Added by you</small></span><span class="cb">✓</span></button>';};
@@ -1348,7 +1358,7 @@ function viewShop(){
 function fridgeRow(i,today,over){
   const q=i.q!=null?fmtQ(i.q,i.u):'',lbl=over||useLabel(i.use,today);
   const warn=i.use&&i.use<=addDays(today,1)&&!LONGLIFE[i.aisle];
-  return '<div class="swr"><button class="swdel" data-act="fridge-swipe-del" data-id="'+esc(i.id)+'" tabindex="-1" aria-label="Delete '+esc(i.name)+'">Delete</button><button class="mi fi'+(warn?' warn':'')+'" data-act="fridge-edit" data-id="'+esc(i.id)+'"><span class="ico">'+iconFor(i.name,i.aisle)+'</span><span class="nm"><span class="t"><span class="cap">'+esc(i.name)+'</span></span>'+((lbl||i.est)?'<small>'+esc(lbl||'')+(i.est?(lbl?' · ':'')+'<span class="est">⚠ Amount guessed, tap to confirm</span>':'')+'</small>':'')+'</span>'+(q?'<span class="qty">'+esc(q)+'</span>':'')+'</button></div>';
+  return '<div class="swr"><button class="swdel" data-act="fridge-swipe-del" data-id="'+esc(i.id)+'" tabindex="-1" aria-label="Delete '+esc(i.name)+'">Delete</button><button class="mi fi'+(warn?' warn':'')+'" data-act="fridge-edit" data-id="'+esc(i.id)+'"><span class="ico">'+iconFor(i.name,i.aisle)+'</span><span class="nm"><span class="t"><span class="cap">'+esc(i.name)+'</span></span>'+((lbl||i.est)?'<small>'+esc(lbl||'')+(i.est?(lbl?' · ':'')+'<span class="est">⚠ Guessed amount</span>':'')+'</small>':'')+'</span>'+(q?'<span class="qty">'+esc(q)+'</span>':'')+'</button></div>';
 }
 function viewFridge(){
   const items=S.fridge.items||[],pend=pendingMeals(S,mcToday());
@@ -1784,7 +1794,7 @@ function openRules(){
         h+='<div class="set-lbl">Data</div>';
         h+='<button class="opt" data-act="backup-restore"><span class="ic">{ }</span><span><b>Import shifts</b><span>Paste the shifts JSON Claude gives you.</span></span></button>';
       }
-      h+='<div class="small muted" style="text-align:center;padding-top:4px">Version 27 Nov, 19:05</div>';
+      h+='<div class="small muted" style="text-align:center;padding-top:4px">Version 27 Nov, 19:32</div>';
       return h;
     },
     foot:function(){return '<button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="save-rules">Save</button>';}});
