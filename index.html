@@ -958,7 +958,7 @@ function persistLocal(){
 function loadLocal(){
   const raw=lsGet('kt-data');if(!raw)return;
   try{const d=JSON.parse(raw);
-    S.recipes=d.recipes||{};S.shifts=d.shifts||{};S.plan=d.plan||{};S.settings=mergeSettings(d.settings);
+    S.recipes=d.recipes||{};Object.keys(S.recipes).forEach(function(k){const r=S.recipes[k];if(r&&/^Starter version from Claude/i.test(r.notes||''))r.notes='';});S.shifts=d.shifts||{};S.plan=d.plan||{};S.settings=mergeSettings(d.settings);
     S.shop=Object.assign({checked:{},extras:[],horizon:'all',shopped:{}},d.shop||{});
     S.fridge=Object.assign({items:[],from:null},d.fridge||{});
     if(!d.fridge||lsGet('kt-fl')==='1'){S.fridgeLost=true;lsSet('kt-fl','1');}
@@ -1444,8 +1444,8 @@ function openRecipe(id){
       h+='<div class="chosen"><span class="label">Servings</span><span class="stepper"><button data-act="rsv" data-d="-1" aria-label="Fewer">−</button><b>'+c.sv+'</b><button data-act="rsv" data-d="1" aria-label="More">+</button></span></div>';
       h+='<div><h3 style="margin-bottom:4px">Ingredients</h3><ul class="ing">'+(r.ingredients||[]).map(function(ing,k){return '<li><span>'+esc(ing.n)+(ing.note?' <span class="muted small">'+esc(ing.note)+'</span>':'')+'</span><span>'+esc(sc[k])+'</span></li>';}).join('')+'</ul></div>';
       if((r.method||[]).length)h+='<div><h3 style="margin-bottom:10px">Method</h3><ol class="steps">'+r.method.map(function(s){return '<li>'+esc(s)+'</li>';}).join('')+'</ol></div>';
-      if(r.notes)h+='<div class="note">'+esc(r.notes)+'</div>';
-      h+='<div class="row-actions"><button class="btn ghost sm" data-act="edit-recipe">Edit</button><button class="btn ghost sm" data-act="cooked">Mark as cooked</button><button class="btn danger sm" data-act="del-recipe">Delete</button></div>';
+      if(r.notes&&!/^Starter version from Claude/i.test(r.notes))h+='<div class="note">'+esc(r.notes)+'</div>';
+      h+='<div class="row-actions"><button class="btn ghost sm" data-act="edit-recipe">Edit</button><button class="btn danger sm" data-act="del-recipe">Delete</button></div>';
       return h;
     },
     foot:function(c){
@@ -1678,7 +1678,7 @@ function openRules(){
         h+='<div class="set-lbl">Data</div>';
         h+='<button class="opt" data-act="backup-restore"><span class="ic">{ }</span><span><b>Import shifts</b><span>Paste the shifts JSON Claude gives you.</span></span></button>';
       }
-      h+='<div class="small muted" style="text-align:center;padding-top:4px">Version 27 Nov, 16:32</div>';
+      h+='<div class="small muted" style="text-align:center;padding-top:4px">Version 27 Nov, 16:41</div>';
       return h;
     },
     foot:function(){return '<button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="save-rules">Save</button>';}});
