@@ -45,3 +45,7 @@ grant select on public.kt_docs to service_role;
 -- 5. Let the app (anon key) save its phone subscription
 grant usage on schema public to anon;
 grant select, insert, update, delete on public.kt_push to anon;
+
+-- 6. Let both keys use the auto-numbering counters
+grant usage, select on all sequences in schema public to anon;
+grant usage, select on all sequences in schema public to service_role;
