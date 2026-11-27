@@ -41,3 +41,7 @@ grant usage on schema public to service_role;
 grant all on public.kt_push to service_role;
 grant all on public.kt_push_log to service_role;
 grant select on public.kt_docs to service_role;
+
+-- 5. Let the app (anon key) save its phone subscription
+grant usage on schema public to anon;
+grant select, insert, update, delete on public.kt_push to anon;
