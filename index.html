@@ -992,6 +992,18 @@ function lsGet(k){try{return localStorage.getItem(k);}catch(e){return null;}}
 function lsSet(k,v){try{localStorage.setItem(k,v);return true;}catch(e){return false;}}
 function lsDel(k){try{localStorage.removeItem(k);}catch(e){}}
 
+// ---------- phone reminders (web push) ----------
+const VAPID_PUBLIC='BA8FrvG9zpbZFia4oJI8j7E51bdtGr7HKlmV9hZSy8YERZqMRo6yzuzC8ch80psM0Gz2eZrynhsSso8FcAQkW2k';
+function urlB64(b){const p='='.repeat((4-b.length%4)%4),r=(b+p).replace(/-/g,'+').replace(/_/g,'/'),raw=atob(r),o=new Uint8Array(raw.length);for(let i=0;i<raw.length;i++)o[i]=raw.charCodeAt(i);return o;}
+function pushWho(){return lsGet('kt-who')==='viv'?'viv':'julian';}
+async function pushSave(sub){
+  await syReq('kt_push?on_conflict=endpoint',{method:'POST',headers:{'Content-Type':'application/json',Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({household:SY.cfg.code,who:pushWho(),endpoint:sub.endpoint,sub:sub.toJSON()})});
+}
+function pushStatus(){
+  if(!('Notification' in window)||!('PushManager' in window))return 'Not available here. Open the app from the Home Screen icon on your iPhone.';
+  if(Notification.permission==='denied')return 'Blocked. Turn notifications back on for this app in iPhone Settings.';
+  return lsGet('kt-push')==='1'&&Notification.permission==='granted'?'On for this phone ('+(pushWho()==='viv'?'Viv':'Julian')+').':'Off on this phone.';
+}
 // ---------- sync (optional shared database, one row per item) ----------
 const SY={cfg:null,base:{},busy:false,again:false,timer:null,status:'',last:0,dirty:false};
 function syLoad(){
@@ -1833,10 +1845,13 @@ function openRules(){
           h+='<div class="field"><label for="sy-url">Project URL</label><input id="sy-url" class="inp" placeholder="https://xxxx.supabase.co" autocapitalize="off" autocorrect="off"></div><div class="field"><label for="sy-key">Anon public key</label><input id="sy-key" class="inp" autocapitalize="off" autocorrect="off" placeholder="eyJ…"></div><div class="field"><label for="sy-code">Household code (make one up, keep it private)</label><input id="sy-code" class="inp" autocapitalize="off" autocorrect="off" placeholder="e.g. a long random phrase"></div><button class="btn" data-act="sync-save">Connect</button>';
         }
         h+='</div>';
+        if(SY.cfg){
+          h+='<div class="sect"><div class="set-hd"><span class="ic">🔔</span><span><b>Reminders on this phone</b><span>Get the pickup reminder on this iPhone. Do this on each phone.</span></span></div><div class="field"><label>This phone belongs to</label><div class="seg"><button aria-pressed="'+(pushWho()==='julian')+'" data-act="push-who" data-v="julian">Julian</button><button aria-pressed="'+(pushWho()==='viv')+'" data-act="push-who" data-v="viv">Viv</button></div></div><div class="note" id="push-status">'+esc(pushStatus())+'</div><div class="tri"><button class="btn sm" data-act="push-on">Turn on reminders</button><button class="btn ghost sm" data-act="push-test">Send a test</button></div></div>';
+        }
         h+='<div class="set-lbl">Data</div>';
         h+='<button class="opt" data-act="backup-restore"><span class="ic">{ }</span><span><b>Import shifts</b><span>Paste the shifts JSON Claude gives you.</span></span></button>';
       }
-      h+='<div class="small muted" style="text-align:center;padding-top:4px">Version 27 Nov, 20:10</div>';
+      h+='<div class="small muted" style="text-align:center;padding-top:4px">Version 27 Nov, 20:48</div>';
       return h;
     },
     foot:function(){return '<button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="save-rules">Save</button>';}});
@@ -2148,6 +2163,35 @@ const ACT={
   'unsure-no':function(el){
     if(!guardWrite())return;
     const sure=Object.assign({},S.shop.sure||{});sure[el.dataset.key]='no';saveShop({sure:sure});
+  },
+  'push-who':function(el){
+    lsSet('kt-who',el.dataset.v);
+    el.parentNode.querySelectorAll('button').forEach(function(b){b.setAttribute('aria-pressed',String(b===el));});
+    if(lsGet('kt-push')==='1'&&SY.cfg)navigator.serviceWorker.ready.then(function(r){return r.pushManager.getSubscription();}).then(function(sub){if(sub)return pushSave(sub);}).then(function(){toast('Saved.');}).catch(function(){});
+  },
+  'push-on':async function(){
+    if(!SY.cfg){toast('Connect sync first.');return;}
+    if(!('serviceWorker' in navigator)||!('PushManager' in window)||!('Notification' in window)){toast('Open the app from the Home Screen icon first.');return;}
+    try{
+      const perm=await Notification.requestPermission();
+      if(perm!=='granted'){toast('Notifications are blocked for this app.');return;}
+      const reg=await navigator.serviceWorker.ready;
+      let sub=await reg.pushManager.getSubscription();
+      if(!sub)sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlB64(VAPID_PUBLIC)});
+      await pushSave(sub);lsSet('kt-push','1');
+      const st=document.getElementById('push-status');if(st)st.textContent=pushStatus();
+      toast('Reminders are on.');
+    }catch(e){toast('Couldn’t turn on: '+String(e&&e.message||e).slice(0,120));}
+  },
+  'push-test':async function(){
+    if(!SY.cfg){toast('Connect sync first.');return;}
+    try{
+      let base=SY.cfg.url;try{base=new URL(SY.cfg.url).origin;}catch(e){}
+      const r=await fetch(base+'/functions/v1/pickup-reminder?test=1&who='+pushWho(),{headers:{Authorization:'Bearer '+SY.cfg.key,apikey:SY.cfg.key}});
+      const j=await r.json().catch(function(){return {};});
+      if(!r.ok)toast('Test failed: '+(j.error||r.status).toString().slice(0,120));
+      else{const n=(j.households||[]).reduce(function(a,h){return a+(h.sent||0);},0);toast(n?'Sent. It should arrive in a few seconds.':'Nothing sent. Turn reminders on first.');}
+    }catch(e){toast('Test failed: '+String(e&&e.message||e).slice(0,100));}
   },
   'fridge-add':function(){if(guardWrite())openFridgeAdd();},
   'fridge-add-go':function(el){
