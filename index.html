@@ -387,7 +387,7 @@ const DEF={
   commute:30,dinnerTime:'18:30',cookBuffer:45,
   vAnchor:'2026-11-23',vAnchorType:'early',vDays:[1,2,3,4,5],
   vEarlyStart:'08:00',vEarlyEnd:'16:30',vLateStart:'11:30',vLateEnd:'20:00',vPacked:true,
-  takeaway:true,jFactor:1.3,vFactor:1,
+  takeaway:true,jFactor:1.3,vFactor:1,everyday:'Greek yoghurt, Sourdough, Eggs, Milk',
   staples:'salt, pepper, black pepper, olive oil, vegetable oil, oil, water',
   presets:[
     {id:'pls-fri-early',name:'PLS Friday early',match:'pls, premier league',days:[5],leave:'08:00',ret:'18:00',food:false,away:false},
@@ -694,6 +694,13 @@ function fridgeFromShopping(S,dates,today){
   });
 }
 function keyWords(n){return ingKey(n).split(' ').filter(Boolean);}
+function everydayList(S){return String(S.settings&&S.settings.everyday||'').split(',').map(function(x){return x.trim();}).filter(Boolean);}
+function isEveryday(S,name){return everydayList(S).some(function(n){return nameMatch(n,name)>0;});}
+function boughtLabel(iso,today){
+  if(!iso)return '';
+  const n=Math.round((parseISO(today)-parseISO(iso))/DAYMS);
+  return n<=0?'Bought today':n===1?'Bought yesterday':'Bought '+n+' days ago';
+}
 function nameMatch(a,b){
   const x=keyWords(a),y=keyWords(b);if(!x.length||!y.length)return 0;
   if(x.join(' ')===y.join(' '))return 2;
@@ -728,10 +735,11 @@ function pendingMeals(S,today){
   });
   return out;
 }
-function fridgeGroups(items,today,loc){
-  const soon=addDays(today,3),g={soon:[],fresh:[],freezer:[],cupboard:[]};
+function fridgeGroups(items,today,loc,ev){
+  const soon=addDays(today,3),g={every:[],soon:[],fresh:[],freezer:[],cupboard:[]};
   items.filter(function(i){return !loc||locOf(i)===loc;}).slice().sort(function(a,b){return String(a.use||'9999').localeCompare(String(b.use||'9999'))||a.name.localeCompare(b.name);}).forEach(function(i){
-    if(i.use&&i.use<=soon&&!LONGLIFE[i.aisle])g.soon.push(i);
+    if(ev&&ev(i.name))g.every.push(i);
+    else if(i.use&&i.use<=soon&&!LONGLIFE[i.aisle])g.soon.push(i);
     else if(i.aisle==='Frozen')g.freezer.push(i);
     else if(LONGLIFE[i.aisle]&&locOf(i)==='pantry')g.cupboard.push(i);
     else g.fresh.push(i);
@@ -1008,7 +1016,7 @@ function shoppedDates(){
 }
 function saveShop(patch){
   S.shop=Object.assign({checked:{},extras:[],horizon:'all',shopped:{}},S.shop,patch);
-  const o={checked:S.shop.checked||{},extras:S.shop.extras||[],horizon:S.shop.horizon,shopped:S.shop.shopped||{}};
+  const o={checked:S.shop.checked||{},extras:S.shop.extras||[],horizon:S.shop.horizon,shopped:S.shop.shopped||{},evBought:S.shop.evBought||{}};
   const keep={};Object.keys(o.shopped).forEach(function(k){if(k.slice(0,10)>=addDays(todayISO(),-14))keep[k]=true;});o.shopped=keep;
   write('shopping/state',o);render(true);
 }
@@ -1135,9 +1143,16 @@ function viewShop(){
   let h='<div class="stack"><div class="seg" role="group" aria-label="Days to shop for">'
    +[[3,'3'],[4,'4'],[5,'5'],[6,'6'],[7,'7'],['all','All']].map(function(o){return '<button aria-pressed="'+(hz===o[0])+'" data-act="horizon" data-h="'+o[0]+'">'+o[1]+'</button>';}).join('')+'</div>';
   h+='<div class="addpill"><input id="extra" placeholder="Add something else" autocomplete="off"><button data-act="add-extra" aria-label="Add">+</button></div>';
-  if(data.staples.length){
-    const st=data.staples,sl=st.filter(function(i){return !ck[i.key];}).length;
-    h+=ddHtml('staples','Check for pantry staples',sl,st.map(function(i){return shopItemHtml(i,!!ck[i.key],i.aisle);}).join(''),false);
+  const evn=everydayList(S),st=data.staples,evb=S.shop.evBought||{};
+  if(evn.length||st.length){
+    const evKey=function(n){return 'ev:'+n.toLowerCase();};
+    const sl=st.filter(function(i){return !ck[i.key];}).length+evn.filter(function(n){return !ck[evKey(n)];}).length;
+    let inner='';
+    if(evn.length)inner+='<div class="mgroup"><h3>Everyday · running low?</h3>'+evn.map(function(n){
+      const lab=boughtLabel(evb[n.toLowerCase()],todayISO());
+      return '<button class="mi'+(ck[evKey(n)]?' done':'')+'" data-act="tick" data-key="'+esc(evKey(n))+'"><span class="ico">'+iconFor(n,'Other')+'</span><span class="nm"><span class="t"><span class="cap">'+esc(n)+'</span></span>'+(lab?'<small>'+esc(lab)+'</small>':'')+'</span><span class="cb">✓</span></button>';}).join('')+'</div>';
+    if(st.length)inner+='<div class="mgroup"><h3>Pantry staples</h3>'+st.map(function(i){return shopItemHtml(i,!!ck[i.key],i.aisle);}).join('')+'</div>';
+    h+=ddHtml('staples','Staples & everyday',sl,inner,true);
   }
   if(!total&&!ex.length){
     h+='<div class="empty"><h3>'+(sd?'All shopped for':'Nothing to buy yet')+'</h3><p class="muted" style="margin:0">'+(sd?'Every planned dinner in this range is already covered. Plan more dinners and the new ingredients appear here.':'Choose dinners on the Plan tab and the ingredients land here, merged and sorted by aisle.')+'</p><button class="btn" data-act="tab" data-tab="plan">Go to the plan</button></div>';
@@ -1148,12 +1163,12 @@ function viewShop(){
     const items=a.items;
     h+='<div class="mgroup"><h3>'+esc(a.aisle)+'</h3>'+items.map(function(i){return shopItemHtml(i,!!ck[i.key],a.aisle);}).join('')+'</div>';
   });
-  if(total||ex.length)h+='<div class="row-actions"><button class="btn soft sm" data-act="shop-finish">Finish shop</button></div>';
+  if(total||ex.length||evn.some(function(n){return ck['ev:'+n.toLowerCase()];}))h+='<div class="row-actions"><button class="btn soft sm" data-act="shop-finish">Finish shop</button></div>';
   if(sd)h+='<div class="small muted">Already shopped for '+sd+' dinner'+(sd>1?'s':'')+'. <button class="btn ghost sm" data-act="shop-reset" style="margin-left:4px">Show them again</button></div>';
   return h+'</div>';
 }
-function fridgeRow(i,today){
-  const q=i.q!=null?fmtQ(i.q,i.u):'',lbl=useLabel(i.use,today);
+function fridgeRow(i,today,over){
+  const q=i.q!=null?fmtQ(i.q,i.u):'',lbl=over||useLabel(i.use,today);
   const warn=i.use&&i.use<=addDays(today,1)&&!LONGLIFE[i.aisle];
   return '<div class="swr"><button class="swdel" data-act="fridge-swipe-del" data-id="'+esc(i.id)+'" tabindex="-1" aria-label="Delete '+esc(i.name)+'">Delete</button><button class="mi fi'+(warn?' warn':'')+'" data-act="fridge-edit" data-id="'+esc(i.id)+'"><span class="ico">'+iconFor(i.name,i.aisle)+'</span><span class="nm"><span class="t"><span class="cap">'+esc(i.name)+'</span></span>'+(lbl?'<small>'+esc(lbl)+'</small>':'')+'</span>'+(q?'<span class="qty">'+esc(q)+'</span>':'')+'</button></div>';
 }
@@ -1167,12 +1182,12 @@ function viewFridge(){
   }
   const nf=items.filter(function(i){return locOf(i)==='fridge';}).length,np=items.length-nf;
   h+='<div class="seg" role="group" aria-label="Where it is kept"><button data-act="fridge-tab" data-v="fridge" aria-pressed="'+(S.ft==='fridge')+'">Fridge · '+nf+'</button><button data-act="fridge-tab" data-v="pantry" aria-pressed="'+(S.ft==='pantry')+'">Pantry · '+np+'</button></div>';
-  const g=fridgeGroups(items,today,S.ft);
-  const labels=S.ft==='pantry'?[['soon','Use soon'],['fresh','Fresh & bread'],['cupboard','Cupboard']]:[['soon','Use soon'],['fresh','In the fridge'],['freezer','Freezer']];
+  const g=fridgeGroups(items,today,S.ft,function(n){return isEveryday(S,n);}),evb=S.shop.evBought||{};
+  const labels=(S.ft==='pantry'?[['soon','Use soon'],['fresh','Fresh & bread'],['cupboard','Cupboard']]:[['soon','Use soon'],['fresh','In the fridge'],['freezer','Freezer']]);labels.unshift(['every','Everyday']);
   let any=false;
   labels.forEach(function(x){
     if(!g[x[0]].length)return;any=true;
-    h+='<div class="mgroup'+(x[0]==='soon'?' soon':'')+'"><h3>'+x[1]+' · '+g[x[0]].length+'</h3>'+g[x[0]].map(function(i){return fridgeRow(i,today);}).join('')+'</div>';
+    h+='<div class="mgroup'+(x[0]==='soon'?' soon':'')+'"><h3>'+x[1]+' · '+g[x[0]].length+'</h3>'+g[x[0]].map(function(i){return fridgeRow(i,today,x[0]==='every'?(boughtLabel(evb[everydayList(S).filter(function(n){return nameMatch(n,i.name)>0;}).map(function(n){return n.toLowerCase();})[0]],today)||undefined):undefined);}).join('')+'</div>';
   });
   if(!any)h+='<div class="empty"><h3>Nothing in the '+(S.ft==='pantry'?'pantry':'fridge')+' yet</h3><button class="btn" data-act="fridge-add">Add items</button></div>';
   return h+'</div>';
@@ -1566,6 +1581,7 @@ function openRules(){
       let h='';
       h+='<div class="set-lbl">Shopping</div>';
       h+='<div class="sect"><div class="set-hd"><span class="ic">🧂</span><span><b>Staples</b><span>Always in the cupboard. They’re listed separately so they don’t clutter the shop.</span></span></div><div class="field"><textarea data-bind="staples" style="min-height:84px" aria-label="Staples">'+esc(d.staples)+'</textarea></div></div>';
+      h+='<div class="sect"><div class="set-hd"><span class="ic">🔁</span><span><b>Everyday items</b><span>Things you get through every few days. They sit at the top of the shopping list as a reminder, with when you last bought them, and at the top of the fridge and pantry.</span></span></div><div class="field"><textarea data-bind="everyday" style="min-height:64px" aria-label="Everyday items">'+esc(d.everyday)+'</textarea></div></div>';
       h+='<div class="sect"><div class="set-hd"><span class="ic">🍽️</span><span><b>Portion size</b><span>How much each of you eats compared with a standard portion. This only changes ingredient amounts in the shop and fridge. Portion counts stay whole numbers.</span></span></div><div class="two"><div class="field"><label for="jf">Julian</label><input id="jf" type="number" inputmode="decimal" step="0.05" min="0.5" max="3" data-bind="jFactor" value="'+esc(d.jFactor)+'"></div><div class="field"><label for="vf">Viv</label><input id="vf" type="number" inputmode="decimal" step="0.05" min="0.5" max="3" data-bind="vFactor" value="'+esc(d.vFactor)+'"></div></div></div>';
       if(STANDALONE){
         h+='<div class="set-lbl">Devices</div>';
@@ -1579,7 +1595,7 @@ function openRules(){
         h+='<div class="set-lbl">Data</div>';
         h+='<button class="opt" data-act="backup-restore"><span class="ic">{ }</span><span><b>Import shifts</b><span>Paste the shifts JSON Claude gives you.</span></span></button>';
       }
-      h+='<div class="small muted" style="text-align:center;padding-top:4px">Version 27 Nov, 10:20</div>';
+      h+='<div class="small muted" style="text-align:center;padding-top:4px">Version 27 Nov, 10:50</div>';
       return h;
     },
     foot:function(){return '<button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="save-rules">Save</button>';}});
@@ -1911,9 +1927,17 @@ const ACT={
     if(!guardWrite())return;
     const sp=Object.assign({},S.shop.shopped||{});
     const bought=fridgeFromShopping(S,shopDates(),todayISO());
+    const evb=Object.assign({},S.shop.evBought||{}),cks=S.shop.checked||{},tdy=todayISO();let items=(S.fridge.items||[]).slice();
+    everydayList(S).forEach(function(n){
+      if(!cks['ev:'+n.toLowerCase()])return;
+      evb[n.toLowerCase()]=tdy;
+      const old=items.filter(function(f){return nameMatch(f.name,n)>0;})[0];
+      items=items.filter(function(f){return nameMatch(f.name,n)===0;});
+      bought.push(fridgeRec(n,null,'',undefined,tdy,undefined,old?locOf(old):undefined));
+    });
     shopDates().forEach(function(d){mealsOn(S,d).forEach(function(m){sp[m.key]=true;});});
-    if(bought.length){S.fridge=Object.assign({},S.fridge,{items:(S.fridge.items||[]).concat(bought),from:S.fridge.from||todayISO()});persistLocal();}
-    saveShop({shopped:sp,checked:{},extras:(S.shop.extras||[]).filter(function(e){return !e.done;})});
+    if(bought.length){S.fridge=Object.assign({},S.fridge,{items:items.concat(bought),from:S.fridge.from||todayISO()});persistLocal();}
+    saveShop({shopped:sp,checked:{},evBought:evb,extras:(S.shop.extras||[]).filter(function(e){return !e.done;})});
     toast(bought.length?'Done. '+bought.length+(bought.length===1?' item':' items')+' added to the fridge.':'Done. Those dinners are marked as shopped for.');
   },
   'shop-reset':function(){
