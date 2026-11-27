@@ -530,7 +530,8 @@ function buildShopping(S,dates){
   const map=new Map(),spd=(S.shop&&S.shop.shopped)||{};
   for(const iso of dates){
    for(const m of mealsOn(S,iso)){
-    if(spd[m.key])continue;
+    const pl=S.plan[iso]||{},cd=m.slot==='lunch'?(pl.lunch&&pl.lunch.cooked):pl.cooked;
+    if(cd)continue; // cooked meals already came out of the fridge
     const r=S.recipes[m.rid];if(!r)continue;
     const portions=m.portions;
     const f=portions*mealWeight(S,iso,m.slot)/(r.servings||2);
@@ -1131,13 +1132,9 @@ function horizonDates(){
   const a=[];for(let i=0;i<h;i++)a.push(addDays(t,i));return a;
 }
 function shopDates(){
-  const sp=S.shop.shopped||{};
-  return horizonDates().filter(function(d){return mealsOn(S,d).some(function(m){return !sp[m.key];});});
+  return horizonDates().filter(function(d){return mealsOn(S,d).some(function(m){const p=S.plan[d]||{};return !(m.slot==='lunch'?(p.lunch&&p.lunch.cooked):p.cooked);});});
 }
-function shoppedDates(){
-  const sp=S.shop.shopped||{};
-  return horizonDates().filter(function(d){const ms=mealsOn(S,d);return ms.length&&ms.every(function(m){return sp[m.key];});});
-}
+function shoppedDates(){return [];}
 function saveShop(patch){
   S.shop=Object.assign({checked:{},extras:[],horizon:'all',shopped:{}},S.shop,patch);
   const o={checked:S.shop.checked||{},extras:S.shop.extras||[],horizon:S.shop.horizon,shopped:S.shop.shopped||{},evBought:S.shop.evBought||{}};
@@ -1263,7 +1260,7 @@ function viewShop(){
   const ex=S.shop.extras||[];
   const total=data.aisles.reduce(function(n,a){return n+a.items.length;},0);
   const left=data.aisles.reduce(function(n,a){return n+a.items.filter(function(i){return !ck[i.key];}).length;},0)+ex.filter(function(e){return !e.done;}).length;
-  const sd=shoppedDates().length;
+  const sd=shopDates().length;
   let h='<div class="stack"><div class="seg" role="group" aria-label="Days to shop for">'
    +[[3,'3'],[4,'4'],[5,'5'],[6,'6'],[7,'7'],['all','All']].map(function(o){return '<button aria-pressed="'+(hz===o[0])+'" data-act="horizon" data-h="'+o[0]+'">'+o[1]+'</button>';}).join('')+'</div>';
   h+='<div class="addpill"><input id="extra" placeholder="Add something else" autocomplete="off"><button data-act="add-extra" aria-label="Add">+</button></div>';
@@ -1279,7 +1276,7 @@ function viewShop(){
     h+=ddHtml('staples','Staples & everyday',sl,inner,true);
   }
   if(!total&&!ex.length){
-    h+='<div class="empty"><h3>'+(sd?'All shopped for':'Nothing to buy yet')+'</h3><p class="muted" style="margin:0">'+(sd?'Every planned dinner in this range is already covered. Plan more dinners and the new ingredients appear here.':'Choose dinners on the Plan tab and the ingredients land here, merged and sorted by aisle.')+'</p><button class="btn" data-act="tab" data-tab="plan">Go to the plan</button></div>';
+    h+='<div class="empty"><h3>'+(sd?'Nothing more to buy':'Nothing to buy yet')+'</h3><p class="muted" style="margin:0">'+(sd?'Everything the planned dinners need is already at home. Plan more dinners and anything missing appears here.':'Choose dinners on the Plan tab and the ingredients land here, merged and sorted by aisle.')+'</p><button class="btn" data-act="tab" data-tab="plan">Go to the plan</button></div>';
   }
   const exBy={};
   ex.forEach(function(e){let a=guessAisle(e.name);if(AISLES.indexOf(a)<0)a='Other';(exBy[a]=exBy[a]||[]).push(e);});
@@ -1291,7 +1288,6 @@ function viewShop(){
     h+='<div class="mgroup"><h3>'+esc(a)+'</h3>'+items.map(function(i){return shopItemHtml(i,!!ck[i.key],a);}).join('')+xs.map(exHtml).join('')+'</div>';
   });
   if(total||ex.length||evn.some(function(n){return ck['ev:'+n.toLowerCase()];}))h+='<div class="row-actions"><button class="btn soft sm" data-act="shop-finish">Finish shop</button></div>';
-  if(sd)h+='<div class="small muted">Already shopped for '+sd+' dinner'+(sd>1?'s':'')+'. <button class="btn ghost sm" data-act="shop-reset" style="margin-left:4px">Show them again</button></div>';
   return h+'</div>';
 }
 function fridgeRow(i,today,over){
@@ -1733,7 +1729,7 @@ function openRules(){
         h+='<div class="set-lbl">Data</div>';
         h+='<button class="opt" data-act="backup-restore"><span class="ic">{ }</span><span><b>Import shifts</b><span>Paste the shifts JSON Claude gives you.</span></span></button>';
       }
-      h+='<div class="small muted" style="text-align:center;padding-top:4px">Version 27 Nov, 17:42</div>';
+      h+='<div class="small muted" style="text-align:center;padding-top:4px">Version 27 Nov, 17:58</div>';
       return h;
     },
     foot:function(){return '<button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="save-rules">Save</button>';}});
