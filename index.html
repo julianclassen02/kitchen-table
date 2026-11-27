@@ -695,6 +695,18 @@ function addFridgeItems(items,recs,sum){
   });
   return {items:out,added:res.added,merged:res.merged,skipped:res.skipped};
 }
+const SYN={yogurt:'yoghurt',yoghourt:'yoghurt',zucchini:'courgette',eggplant:'aubergine',cilantro:'coriander',scallion:'spring onion',scallions:'spring onion'};
+function fridgeSearch(items,q){
+  const toks=String(q||'').toLowerCase().split(/[^a-z]+/).filter(Boolean).map(function(t){return SYN[t]||t;});
+  if(!toks.length)return [];
+  return items.filter(function(i){
+    const n=String(i.name||'').toLowerCase();
+    return toks.every(function(t){return n.indexOf(t)>=0||(t.length>3&&t.slice(-1)==='s'&&n.indexOf(t.slice(0,-1))>=0)||(t.length>3&&t.slice(-2)==='es'&&n.indexOf(t.slice(0,-2))>=0);});
+  }).sort(function(a,b){
+    const t=toks[0],x=String(a.name).toLowerCase().indexOf(t)===0?0:1,y=String(b.name).toLowerCase().indexOf(t)===0?0:1;
+    return x-y||String(a.name).localeCompare(String(b.name));
+  });
+}
 function fridgeDedupe(items){
   const out=[];
   items.forEach(function(it){
@@ -819,7 +831,7 @@ function useLabel(use,today){
 
 // ---------- state ----------
 const S={recipes:{},shifts:{},plan:{},settings:mergeSettings(null),shop:{checked:{},extras:[],horizon:'all'},fridge:{items:[],from:null},
-  ui:{},ft:'fridge',tab:'plan',planOff:0,shiftOff:0,rq:'',rtag:'',loaded:{},canWrite:true,live:false,slow:false};
+  ui:{},ft:'fridge',fq:'',tab:'plan',planOff:0,shiftOff:0,rq:'',rtag:'',loaded:{},canWrite:true,live:false,slow:false};
 let DB=null,SAMPLE=null,SAMPLE_LIM=null,pendingRender=false,STANDALONE=false;
 function lsGet(k){try{return localStorage.getItem(k);}catch(e){return null;}}
 function lsSet(k,v){try{localStorage.setItem(k,v);return true;}catch(e){return false;}}
@@ -1170,7 +1182,7 @@ function viewRecipes(){
 
 // Only exact matches get a picture; '' entries block a looser match below and fall back to the cart.
 const ICONS=[
-['soup',''],['ketchup',''],['sundried',''],['sun-dried',''],['weetabix',''],['whey',''],['protein',''],['chipolata',''],['sausage',''],['stock',''],['stock cube',''],['bouillon',''],['paste',''],['puree',''],['sauce',''],['oil',''],['vinegar',''],['peanut butter',''],['coconut milk',''],['coconut oil',''],['oat milk',''],['almond milk',''],['soy milk',''],['lemon juice',''],['garlic bread',''],['egg noodle',''],['breadcrumb',''],['black pepper',''],['ice cream','🍦'],['rice noodle','🍜'],['ricotta',''],['ravioli',''],['tortellini',''],['burger','🍔'],['brioche bun','🍔'],['chopped tomato','🥫'],['plum tomato','🥫'],['tinned tomato','🥫'],['canned tomato','🥫'],['cayenne','🌶️'],['linguine','🍝'],['linguini','🍝'],['tagliatelle','🍝'],['fettuccine','🍝'],['tagliolini','🍝'],['bucatini','🍝'],['vermicelli','🍝'],['capellini','🍝'],['angel hair','🍝'],['pappardelle','🍝'],
+['soup',''],['chutney',''],['pickle',''],['ketchup',''],['sundried',''],['sun-dried',''],['weetabix',''],['whey',''],['protein',''],['chipolata',''],['sausage',''],['stock',''],['stock cube',''],['bouillon',''],['paste',''],['puree',''],['sauce',''],['oil',''],['vinegar',''],['peanut butter',''],['coconut milk',''],['coconut oil',''],['oat milk',''],['almond milk',''],['soy milk',''],['lemon juice',''],['garlic bread',''],['egg noodle',''],['breadcrumb',''],['black pepper',''],['ice cream','🍦'],['rice noodle','🍜'],['ricotta',''],['ravioli',''],['tortellini',''],['burger','🍔'],['brioche bun','🍔'],['chopped tomato','🥫'],['plum tomato','🥫'],['tinned tomato','🥫'],['canned tomato','🥫'],['cayenne','🌶️'],['linguine','🍝'],['linguini','🍝'],['tagliatelle','🍝'],['fettuccine','🍝'],['tagliolini','🍝'],['bucatini','🍝'],['vermicelli','🍝'],['capellini','🍝'],['angel hair','🍝'],['pappardelle','🍝'],
 ['toilet roll','🧻'],['toilet paper','🧻'],['loo roll','🧻'],['kitchen roll','🧻'],['kitchen towel','🧻'],['soap','🧼'],['hand wash','🧼'],['sponge','🧽'],['shampoo','🧴'],['conditioner','🧴'],['lotion','🧴'],['sun cream','🧴'],['toothbrush','🪥'],['razor','🪒'],['plaster','🩹'],['painkiller','💊'],['paracetamol','💊'],['ibuprofen','💊'],['vitamin','💊'],['battery','🔋'],['batteries','🔋'],['light bulb','💡'],['candle','🕯️'],['flower','💐'],
 ['coffee','☕'],['tea','🫖'],['beer','🍺'],['lager','🍺'],['prosecco','🥂'],['champagne','🥂'],['juice','🧃'],['cola','🥤'],['chocolate','🍫'],['biscuit','🍪'],['cookie','🍪'],['cake','🍰'],['popcorn','🍿'],['honey','🍯'],['peanut','🥜'],['nuts','🥜'],['coconut','🥥'],
 ['sweet potato','🍠'],['onion','🧅'],['garlic','🧄'],['carrot','🥕'],['potato','🥔'],['tomato','🍅'],['lemon','🍋'],['parsley','🌿'],['mint','🌿'],['thyme','🌿'],['basil','🌿'],['coriander','🌿'],['rosemary','🌿'],['aubergine','🍆'],['lettuce','🥬'],['spinach','🥬'],['cucumber','🥒'],['pepper','🫑'],['chilli','🌶️'],['mushroom','🍄'],['avocado','🥑'],['apple','🍎'],['banana','🍌'],['peas','🫛'],['green beans','🫛'],['beans','🫘'],
@@ -1233,12 +1245,26 @@ function fridgeRow(i,today,over){
   return '<div class="swr"><button class="swdel" data-act="fridge-swipe-del" data-id="'+esc(i.id)+'" tabindex="-1" aria-label="Delete '+esc(i.name)+'">Delete</button><button class="mi fi'+(warn?' warn':'')+'" data-act="fridge-edit" data-id="'+esc(i.id)+'"><span class="ico">'+iconFor(i.name,i.aisle)+'</span><span class="nm"><span class="t"><span class="cap">'+esc(i.name)+'</span></span>'+(lbl?'<small>'+esc(lbl)+'</small>':'')+'</span>'+(q?'<span class="qty">'+esc(q)+'</span>':'')+'</button></div>';
 }
 function viewFridge(){
-  const today=todayISO(),items=S.fridge.items||[],pend=pendingMeals(S,mcToday());
+  const items=S.fridge.items||[],pend=pendingMeals(S,mcToday());
   let h='<div class="stack">';
   if(pend.length)h+='<button class="banner info mcb" data-act="mc-open"><b>'+(pend.length===1?'Did you cook last night’s meal?':'Confirm '+pend.length+' meals you planned')+'</b><span>Confirm it, rate it, and the fridge updates.</span></button>';
   if(!items.length){
     h+='<div class="empty"><h3>Nothing at home yet</h3><p class="muted" style="margin:0">Add what you have now. After that, everything you buy with Finish shop lands here, and every meal you confirm comes off.</p><button class="btn" data-act="fridge-add">Add what you’ve got</button></div>';
     return h+'</div>';
+  }
+  h+='<input class="search" id="fsearch" type="search" placeholder="Do we have…? Search fridge and pantry" value="'+esc(S.fq)+'" autocomplete="off"><div id="fres" class="stack">'+fridgeBody()+'</div>';
+  return h+'</div>';
+}
+function fridgeBody(){
+  const today=todayISO(),items=S.fridge.items||[],q=String(S.fq||'').trim();
+  let h='';
+  if(q){
+    const res=fridgeSearch(items,q);
+    if(!res.length)return '<div class="empty"><h3>No '+esc(q)+' at home</h3><p class="muted" style="margin:0">Not in the fridge or pantry.</p><button class="btn" data-act="fq-shop">Add to shopping list</button></div>';
+    return '<div class="mgroup"><h3>At home · '+res.length+'</h3>'+res.map(function(i){
+      const u=useLabel(i.use,today);
+      return fridgeRow(i,today,(locOf(i)==='pantry'?'Pantry':'Fridge')+(u?' · '+u:''));
+    }).join('')+'</div>';
   }
   const nf=items.filter(function(i){return locOf(i)==='fridge';}).length,np=items.length-nf;
   h+='<div class="seg" role="group" aria-label="Where it is kept"><button data-act="fridge-tab" data-v="fridge" aria-pressed="'+(S.ft==='fridge')+'">Fridge · '+nf+'</button><button data-act="fridge-tab" data-v="pantry" aria-pressed="'+(S.ft==='pantry')+'">Pantry · '+np+'</button></div>';
@@ -1247,7 +1273,7 @@ function viewFridge(){
     h+='<div class="mgroup'+(sec.k==='soon'?' soon':'')+'"><h3>'+sec.label+' · '+sec.items.length+'</h3>'+sec.items.map(function(i){return fridgeRow(i,today,sec.k==='every'?(boughtLabel(evb[everydayList(S).filter(function(n){return nameMatch(n,i.name)>0;}).map(function(n){return n.toLowerCase();})[0]],today)||undefined):undefined);}).join('')+'</div>';
   });
   if(!any)h+='<div class="empty"><h3>Nothing in the '+(S.ft==='pantry'?'pantry':'fridge')+' yet</h3><button class="btn" data-act="fridge-add">Add items</button></div>';
-  return h+'</div>';
+  return h;
 }
 function saveFridge(items,extra){
   S.fridge=Object.assign({},S.fridge,{items:items,from:S.fridge.from||todayISO()},extra||{});
@@ -1652,7 +1678,7 @@ function openRules(){
         h+='<div class="set-lbl">Data</div>';
         h+='<button class="opt" data-act="backup-restore"><span class="ic">{ }</span><span><b>Import shifts</b><span>Paste the shifts JSON Claude gives you.</span></span></button>';
       }
-      h+='<div class="small muted" style="text-align:center;padding-top:4px">Version 27 Nov, 15:50</div>';
+      h+='<div class="small muted" style="text-align:center;padding-top:4px">Version 27 Nov, 16:20</div>';
       return h;
     },
     foot:function(){return '<button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="save-rules">Save</button>';}});
@@ -1944,6 +1970,15 @@ const ACT={
     inp.value='';
     saveShop({extras:(S.shop.extras||[]).concat([{id:uid('x'),name:v,done:false}])});
   },
+  'fq-shop':function(){
+    if(!guardWrite())return;
+    const raw=String(S.fq||'').trim();if(!raw)return;
+    const name=raw.charAt(0).toUpperCase()+raw.slice(1);
+    const ex=S.shop.extras||[];
+    if(ex.some(function(e){return !e.done&&String(e.name).toLowerCase()===name.toLowerCase();})){toast(name+' is already on the list.');return;}
+    saveShop({extras:ex.concat([{id:uid('x'),name:name,done:false}])});
+    toast('Added '+name+' to the shopping list.');
+  },
   'fridge-add':function(){if(guardWrite())openFridgeAdd();},
   'fridge-add-go':function(el){
     const c=ctxOf(el),t=todayISO(),add=[];
@@ -2067,7 +2102,8 @@ document.addEventListener('click',function(e){
 });
 function onBind(e){
   const el=e.target;
-  if(el.id==='rsearch'){S.rq=el.value;const l=$('#rlist');if(l)l.innerHTML=recipeList();return;}
+  if(el.id==='fsearch'){if(el.value===S.fq)return;S.fq=el.value;const r=$('#fres');if(r)r.innerHTML=fridgeBody();return;}
+  if(el.id==='rsearch'){if(el.value===S.rq)return;S.rq=el.value;const l=$('#rlist');if(l)l.innerHTML=recipeList();return;}
   if(el.id==='pk-q'){const c=ctxOf(el);c.q=el.value;const pos=el.selectionStart;c.render();const n=$('#pk-q',c.ov);if(n){n.focus();n.setSelectionRange(pos,pos);}return;}
   if(el.id==='p-file'&&e.type==='change'){const c=ctxOf(el);if(el.files&&el.files.length)runImport(c,el.files,null);return;}
   if(el.id==='ics-file'&&e.type==='change'){
