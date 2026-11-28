@@ -1171,6 +1171,28 @@ function makeApiSample(key){
   fn.limits=async function(){return {images:{maxCount:4,mediaTypes:['image/jpeg','image/png','image/webp','image/gif']}};};
   return fn;
 }
+function makeRelaySample(){
+  async function call(prompt,opts){
+    const imgs=[];
+    for(const f of ((opts&&opts.images)||[]))imgs.push(await shrink(f));
+    let base=SY.cfg.url;try{base=new URL(SY.cfg.url).origin;}catch(e){}
+    let r;
+    try{
+      r=await fetch(base+'/functions/v1/recipe-from-image',{method:'POST',headers:{'content-type':'application/json',apikey:SY.cfg.key,Authorization:'Bearer '+SY.cfg.key},
+        body:JSON.stringify({household:SY.cfg.code,images:imgs,aisles:AISLES,tags:TAGS})});
+    }catch(e){throw {code:'upstream_error'};}
+    const j=await r.json().catch(function(){return {};});
+    if(j.error==='bad_key'||j.error==='no_key')throw {code:'bad_key'};
+    if(r.status===429)throw {code:'rate_limited'};
+    if(!r.ok||j.error)throw {code:'upstream_error'};
+    return j.text||'';
+  }
+  const fn=async function(p,o){return {text:await call(p,o)};};
+  fn.json=async function(p,o){return parseLoose(await call(p,o));};
+  fn.limits=async function(){return {images:{maxCount:4,mediaTypes:['image/jpeg','image/png','image/webp','image/gif']}};};
+  return fn;
+}
+function getReader(){return SAMPLE||(SY.cfg?makeRelaySample():null);}
 const $=function(s,r){return (r||document).querySelector(s);};
 const view=$('#view'),layer=$('#layer');
 const esc=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});};
@@ -1694,7 +1716,8 @@ async function runImport(c,files,text){
   const ov=c.ov;c.busy=true;c.err='';c.render();
   try{
     const isImg=!!(files&&files.length);
-    const j=await SAMPLE.json(importPrompt(isImg,text),isImg?{images:Array.from(files).slice(0,(SAMPLE_LIM&&SAMPLE_LIM.images&&SAMPLE_LIM.images.maxCount)||4),modelTier:'default'}:{modelTier:'default'});
+    const rd=getReader();if(!rd)throw {code:'not_granted'};
+    const j=await rd.json(importPrompt(isImg,text),isImg?{images:Array.from(files).slice(0,(SAMPLE_LIM&&SAMPLE_LIM.images&&SAMPLE_LIM.images.maxCount)||4),modelTier:'default'}:{modelTier:'default'});
     if(!j||j.error||!j.name)throw {code:'invalid_json'};
     closeSheet(ov);
     openEditor(draftFromImport(j),'Read from your '+(isImg?'screenshot':'text')+'. Check quantities and steps before saving.');
@@ -1704,7 +1727,7 @@ async function runImport(c,files,text){
   }
 }
 function openAddRecipe(){
-  const can=!!SAMPLE;
+  const can=!!getReader();
   const accept=(SAMPLE_LIM&&SAMPLE_LIM.images&&SAMPLE_LIM.images.mediaTypes.join(','))||'image/*';
   openSheet({title:'Add a recipe',ctx:{mode:'menu',text:'',busy:false,err:''},
     body:function(c){
@@ -1713,6 +1736,8 @@ function openAddRecipe(){
       if(c.mode==='paste'){
         return h+'<div class="field"><label for="p-text">Paste the caption or recipe text</label><textarea id="p-text" data-bind="text" style="min-height:220px" placeholder="Long-press the caption on Instagram or TikTok, copy, and paste here">'+esc(c.text||'')+'</textarea></div>';
       }
+      if(can)h+='<label class="opt" style="cursor:pointer"><span class="ic">📷</span><span><b>From a screenshot</b><span>Pick up to 4 screenshots or photos of a recipe. Claude reads them for you to check.</span></span><input id="rec-img" type="file" accept="'+esc(accept)+'" multiple hidden></label>';
+      else h+='<div class="note">Connect sync in Settings to read recipes from screenshots.</div>';
       h+='<button class="opt" data-act="import-json"><span class="ic">{ }</span><span><b>Import JSON</b><span>Paste recipes that Claude has formatted for you.</span></span></button>'
        +'<button class="opt" data-act="add-manual"><span class="ic">+</span><span><b>Add manually</b><span>Ingredients one per line, method one step per line.</span></span></button>';
       return h;
@@ -1847,7 +1872,7 @@ function openRules(){
         h+='<div class="set-lbl">Data</div>';
         h+='<button class="opt" data-act="backup-restore"><span class="ic">{ }</span><span><b>Import shifts</b><span>Paste the shifts JSON Claude gives you.</span></span></button>';
       }
-      h+='<div class="small muted" style="text-align:center;padding-top:4px">Version 28 Nov, 12:20</div>';
+      h+='<div class="small muted" style="text-align:center;padding-top:4px">Version 28 Nov, 13:05</div>';
       return h;
     },
     foot:function(){return '<button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="save-rules">Save</button>';}});
@@ -2338,6 +2363,10 @@ function onBind(e){
 }
 document.addEventListener('toggle',function(e){const d=e.target;if(d&&d.dataset&&d.dataset.dd){S.ui[d.dataset.dd]=d.open;}},true);
 document.addEventListener('input',onBind);
+document.addEventListener('change',function(e){
+  const t=e.target;
+  if(t&&t.id==='rec-img'&&t.files&&t.files.length){const c=ctxOf(t);if(c&&c.mode==='menu'){const f=Array.from(t.files);t.value='';runImport(c,f,'');}return;}
+});
 document.addEventListener('change',onBind);
 document.addEventListener('focusout',function(){if(pendingRender)setTimeout(function(){const a=document.activeElement;if(!(a&&view.contains(a)&&/^(INPUT|TEXTAREA)$/.test(a.tagName)))render();},50);});
 document.addEventListener('keydown',function(e){

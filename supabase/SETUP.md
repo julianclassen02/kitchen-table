@@ -7,3 +7,9 @@
 
 The function loads its rules from `logic.js` on GitHub Pages, so it follows the app automatically.
 `logic.js` is generated: run `python3 tools/build-logic.py` before committing any change to the logic block in index.html.
+
+## Recipe from a screenshot
+1. Get an Anthropic API key at console.anthropic.com (Settings > API keys) and add a few pounds of credit under Billing.
+2. Edge Functions > Deploy a new function > Via Editor. Name it `recipe-from-image`, file `index.ts`, paste `functions/recipe-from-image/index.ts`, turn Verify JWT off, Deploy.
+3. Edge Functions > Secrets: add `ANTHROPIC_API_KEY` with the key.
+4. In the app: Recipes > Add > From a screenshot.
